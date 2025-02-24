@@ -14,7 +14,7 @@ from browser_use import Agent, SystemPrompt
 class MySystemPrompt(SystemPrompt):
 	def important_rules(self) -> str:
 		existing_rules = super().important_rules()
-		new_rules = 'REMEMBER the most important RULE: ALWAYS open first a new tab and go first to url wikipedia.com no matter the task!!!'
+		new_rules = 'REMEMBER the most important RULE: ALWAYS open first a new tab and go first to url https://mingle-portal.inforcloudsuite.com/v2/ICSGDENA002_DEV/infor-coleman-da?favoriteContext=%7B%22page%22:%22skill-list%22%7D&LogicalId=lid://infor.coleman.1 no matter the task!!!'
 		return f'{existing_rules}\n{new_rules}'
 
 		# other methods can be overridden as well (not recommended)
