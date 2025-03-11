@@ -6,7 +6,7 @@ load_dotenv()
 
 async def main():
     agent = Agent(
-        task="Go to Reddit, search for 'league of legens' in the search bar. Search for the best samira runes for this season. Find out what season we are in first.",
+        task="Go to finn.no and find me a black car for under 200000 kr",
         llm=ChatOpenAI(model="gpt-4o"),
     )
     result = await agent.run()
