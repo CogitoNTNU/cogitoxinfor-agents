@@ -15,10 +15,17 @@ browser = Browser(
         chrome_instance_path="/Applications/Firefox.app/Contents/MacOS/firefox",
         disable_security=True
 
-        # For Windows, typically: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-        # For Linux, typically: '/usr/bin/google-chrome'
-    )
+config = BrowserContextConfig(
+    wait_for_network_idle_page_load_time=6.0,
+    browser_window_size={'width': 1280, 'height': 1100},
+    locale='en-US',
+    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36',
+    highlight_elements=True,
+    viewport_expansion=-1,
 )
+
+browser = Browser()
+context = BrowserContext(browser=browser, config=config)
 
 class MySystemPrompt(SystemPrompt):
     def important_rules(self) -> str:
