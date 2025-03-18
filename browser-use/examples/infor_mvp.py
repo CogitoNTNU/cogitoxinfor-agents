@@ -12,7 +12,7 @@ from browser_use import Agent, SystemPrompt, Browser, BrowserConfig
 browser = Browser(
     config=BrowserConfig(
         # Specify the path to your Chrome executable
-        chrome_instance_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',  # macOS path
+        chrome_instance_path="/Applications/Firefox.app/Contents/MacOS/firefox",
         disable_security=True
 
         # For Windows, typically: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
@@ -45,7 +45,7 @@ async def main():
         },
     ]
     task = (
-        "Objective: Process a customer order efficiently using the Infor M3 system, following each step outlined in the document. Step 1: Enter Customer Order Header: Open ‘Customer Order. Open Toolbox (OIS300/B)’. Locate an existing order or press F14 (or click ‘New Order’)"
+        "wait for 10 seconds after login before you start the task Objective: Process a customer order efficiently using the Infor M3 system, following each step outlined in the document. Step 1: Enter Customer Order Header: Open ‘Customer Order. Open Toolbox (OIS300/B)’. Locate an existing order or press F14 (or click ‘New Order’)"
     )
     model = ChatOpenAI(model='gpt-4o')
     agent = Agent(
