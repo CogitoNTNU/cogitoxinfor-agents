@@ -20,10 +20,11 @@ async def main():
     ]
 
     agent = Agent(
-        task="""You are executing a test of the Infor ERP software called M3.
-Task: Curves can be created in ‘Period Accounting Curves. Open’ (CRS450)
-to reflect the business trading pattern and then used to allocate budgets.""",
+            task="""Step 1: wait 30 seconds You are executing a test of the Infor ERP software called M3
+            you have landed on the right page. and then find create order. Add 'sometext' in customer input field
+            """,
         llm=ChatOpenAI(model="gpt-4o"),
+        initial_actions=initial_actions
     )
 
     # If you intend to pass in `initial_actions`, make sure to include them:

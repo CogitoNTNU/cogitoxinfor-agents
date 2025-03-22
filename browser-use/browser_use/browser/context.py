@@ -133,6 +133,7 @@ class BrowserContext:
 	):
 		self.context_id = str(uuid.uuid4())
 		logger.debug(f'Initializing new browser context with id: {self.context_id}')
+		print("HIIIIIIIIII", flush=True)
 
 		self.config = config
 		self.browser = browser
@@ -271,9 +272,10 @@ class BrowserContext:
 				logger.info(f'Loaded {len(cookies)} cookies from {self.config.cookies_file}')
 				await context.add_cookies(cookies)
 
-		# Expose anti-detection scripts
 		await context.add_init_script(
 			"""
+			console.log('--- Injected Script Start ---');
+
 			// Webdriver property
 			Object.defineProperty(navigator, 'webdriver', {
 				get: () => undefined
@@ -299,15 +301,24 @@ class BrowserContext:
 					Promise.resolve({ state: Notification.permission }) :
 					originalQuery(parameters)
 			);
+
 			(function () {
 				const originalAttachShadow = Element.prototype.attachShadow;
 				Element.prototype.attachShadow = function attachShadow(options) {
 					return originalAttachShadow.call(this, { ...options, mode: "open" });
 				};
 			})();
+
+			console.log('Before contextmenu');
+			document.addEventListener('contextmenu', function (e) {
+				e.stopImmediatePropagation(); // Block SoHo's listener
+				const existingMenu = document.querySelector('.popupmenu-wrapper');
+				if (existingMenu) existingMenu.remove(); // Remove the custom menu if it appears
+			}, true);
+			console.log('After context menu');
+			console.log('--- Injected Script End ---');
 			"""
 		)
-
 		return context
 
 	async def _wait_for_stable_network(self):

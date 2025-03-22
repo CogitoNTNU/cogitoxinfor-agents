@@ -13,8 +13,6 @@ print(API_KEY)
 # this line auto-instruments Browser Use and any browser you use (local or remote)
 Laminar.initialize(project_api_key=API_KEY)
 
-
-
 # Configure the browser to connect to your Chrome instance
 browser = Browser(
     config=BrowserConfig(
@@ -26,6 +24,10 @@ browser = Browser(
         disable_security=True
     )
 )
+
+def inject_javascript(browser, script):
+    page = browser.new_page()
+    page.evaluate(script)
 
 # Create the agent with your configured browser
 agent = Agent(
