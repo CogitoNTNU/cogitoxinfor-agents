@@ -2,6 +2,7 @@ from langchain_openai import ChatOpenAI
 from browser_use import Agent
 import asyncio
 from dotenv import load_dotenv
+
 load_dotenv()
 
 async def main():
@@ -17,13 +18,21 @@ async def main():
             }
         },
     ]
- 
+
     agent = Agent(
-        task= "Your are executing a test of the The Infor ERP software called M3. 
-        Task: Curves can be created in ‘Period Accounting Curves. Open’ (CRS450) to reflect the
-business trading pattern and then used to allocate budgets.",
+        task="""You are executing a test of the Infor ERP software called M3.
+Task: Curves can be created in ‘Period Accounting Curves. Open’ (CRS450)
+to reflect the business trading pattern and then used to allocate budgets.""",
         llm=ChatOpenAI(model="gpt-4o"),
     )
+
+    # If you intend to pass in `initial_actions`, make sure to include them:
+    # agent = Agent(
+    #     task="""...""",
+    #     llm=ChatOpenAI(model="gpt-4o"),
+    #     initial_actions=initial_actions
+    # )
+
     result = await agent.run()
     print(result)
 
