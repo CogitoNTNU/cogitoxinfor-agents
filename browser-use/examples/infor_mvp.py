@@ -1,6 +1,20 @@
 from browser_use import Agent, Browser, BrowserConfig
 from langchain_openai import ChatOpenAI
+from lmnr import Laminar
 import asyncio
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+API_KEY=os.getenv("LMNR_PROJECT_API_KEY")
+print(API_KEY)
+
+
+# this line auto-instruments Browser Use and any browser you use (local or remote)
+Laminar.initialize(project_api_key=API_KEY)
+
+
+
 # Configure the browser to connect to your Chrome instance
 browser = Browser(
     config=BrowserConfig(
