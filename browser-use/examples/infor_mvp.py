@@ -18,8 +18,9 @@ agent = Agent(
         task="""
         step1: open the following link:"
         https://mingle-portal.inforcloudsuite.com/v2/ICSGDENA002_DEV/aa98233d-0f7f-4fe7-8ab8-b5b66eb494c6?favoriteContext=bookmark?OIS100%26%26%26undefined%26A%26Customer%20Order.%20Open%26OIS100%20Customer%20Order.%20Open&LogicalId=lid://infor.m3.m3
-        step 2: type 'sometext' in the customer field.
-        step 3: press 'next' button
+        step 2: wait 20 seconds
+        step 3: type 'sometext' in the customer field.
+        step 4: press 'next' button
         """,
     llm=ChatOpenAI(model='gpt-4o'),
     browser=browser,
