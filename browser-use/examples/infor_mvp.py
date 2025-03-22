@@ -1,19 +1,13 @@
 import json
 import os
 import sys
+import asyncio
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import asyncio
-
 from langchain_openai import ChatOpenAI
 from browser_use import Agent, SystemPrompt, Browser, BrowserConfig
-
-browser = Browser(
-    config=BrowserConfig(
-        # Specify the path to your Chrome executable
-        chrome_instance_path="/Applications/Firefox.app/Contents/MacOS/firefox",
-        disable_security=True
+from browser_use.browser.context import BrowserContext, BrowserContextConfig  # <-- Added missing imports
 
 config = BrowserContextConfig(
     wait_for_network_idle_page_load_time=6.0,

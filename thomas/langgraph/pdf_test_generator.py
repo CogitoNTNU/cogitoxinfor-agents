@@ -390,6 +390,7 @@ def generate_tests_agent():
         {state.requirements}
         
         Please create a detailed test case that specifically tests the functionality described in the PDF.
+        Go step by step through the process and describe the expected results for each step in detail.
         
         Your response should be in this JSON format:
         {{
