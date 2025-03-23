@@ -644,7 +644,7 @@ async def generate_tests_from_pdfs(requirements: List[str], data_path: str = "..
 
 if __name__ == "__main__":
     import asyncio
-    
+
     async def main():
         # Example requirements
         requirements = [
@@ -652,25 +652,34 @@ if __name__ == "__main__":
             "Verify that all required fields are validated",
             "Check that the order can be submitted successfully"
         ]
-        
+
         # Generate tests
         test_cases = await generate_tests_from_pdfs(requirements)
-        
-        # Print the generated test cases
-        print(f"Generated {len(test_cases)} test cases:")
+
+        # Prepare the output string
+        output_lines = [f"Generated {len(test_cases)} test cases:"]
         for test in test_cases:
-            print(f"\nTest ID: {test.id}")
-            print(f"Title: {test.title}")
-            print(f"Description: {test.description}")
-            print("Steps:")
+            output_lines.append(f"\nTest ID: {test.id}")
+            output_lines.append(f"Title: {test.title}")
+            output_lines.append(f"Description: {test.description}")
+            output_lines.append("Steps:")
             for i, step in enumerate(test.steps, 1):
-                print(f"  {i}. {step}")
-            print("Expected Results:")
+                output_lines.append(f"  {i}. {step}")
+            output_lines.append("Expected Results:")
             for i, result in enumerate(test.expected_results, 1):
-                print(f"  {i}. {result}")
-            print("Requirements:")
+                output_lines.append(f"  {i}. {result}")
+            output_lines.append("Requirements:")
             for req in test.requirements:
-                print(f"  - {req}")
-    
+                output_lines.append(f"  - {req}")
+
+        output = "\n".join(output_lines)
+
+        # Print the generated test cases
+        print(output)
+
+        # Write the output to test.txt
+        with open("test.txt", "w") as f:
+            f.write(output)
+
     # Run the example
     asyncio.run(main())

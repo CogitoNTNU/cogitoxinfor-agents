@@ -1,0 +1,21 @@
+Generated 1 test cases:
+
+Test ID: TC001
+Title: Test the Creation of an Internal Sales Order for Rental Agreement
+Description: This test case verifies the process of creating an internal sales order for a rental agreement as described in the PDF. It ensures that all required fields are validated and that the order can be submitted successfully.
+Steps:
+  1. Step 1: Access the Rental Counter application as described in the PDF, which is a web-mashup deployed in the Infor H5 client.
+  2. Step 2: Create a new walk-in customer using the Rental Counter. Ensure that the customer is registered as a category 8 temporary customer in Customer. Open (CRS610).
+  3. Step 3: Identify the rental request by selecting the rental items from warehouse 003. Ensure that the customer location address is correctly entered.
+  4. Step 4: Create a rental agreement by selecting the customer and rental item. Choose the 'Active agreement (prefix A)' option to ensure the rental items leave warehouse 003 onto the on-rent warehouse R03.
+  5. Step 5: Process the rental payment using the cash desk with rental agreement type CO1. Ensure that the deposit amount is collected at the beginning of the agreement if applicable.
+Expected Results:
+  1. Expected result for step 1: The Rental Counter application is accessed successfully, displaying all necessary information on a single application.
+  2. Expected result for step 2: A new walk-in customer is created successfully, and the customer is registered as a category 8 temporary customer in the system.
+  3. Expected result for step 3: The rental request is identified successfully, with the correct rental items selected and the customer location address accurately entered.
+  4. Expected result for step 4: The rental agreement is created successfully, with the rental items moving from warehouse 003 to the on-rent warehouse R03. The agreement is marked as active.
+  5. Expected result for step 5: The rental payment is processed successfully via the cash desk, with the deposit amount collected if applicable. The payment is validated and recorded in Accounts Receivable and the General Ledger.
+Requirements:
+  - Test the process of creating an internal sales order
+  - Verify that all required fields are validated
+  - Check that the order can be submitted successfully

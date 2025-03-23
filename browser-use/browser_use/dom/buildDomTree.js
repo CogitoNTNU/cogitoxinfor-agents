@@ -105,9 +105,17 @@
 
         while (currentElement && currentElement.nodeType === Node.ELEMENT_NODE) {
             // Stop if we hit a shadow root or iframe
-            if (stopAtBoundary && (currentElement.parentNode instanceof ShadowRoot || currentElement.parentNode instanceof HTMLIFrameElement)) {
-                break;
-            }
+            //if (stopAtBoundary && (currentElement.parentNode instanceof ShadowRoot || currentElement.parentNode instanceof HTMLIFrameElement)) {
+              //  break;
+            //}
+          //
+          if (currentElement.parentNode instanceof ShadowRoot) {
+            // Insert the deep selector operator before continuing with the host element
+            segments.unshift('>>>');
+            // Move to the host element of the shadow root
+            currentElement = currentElement.parentNode.host;
+            continue;
+        }
 
             let index = 0;
             let sibling = currentElement.previousSibling;
@@ -120,13 +128,13 @@
             }
 
             const tagName = currentElement.nodeName.toLowerCase();
-            const xpathIndex = index > 0 ? `[${index + 1}]` : '';
-            segments.unshift(`${tagName}${xpathIndex}`);
+            const segment = index > 0 ? `${tagName}:nth-of-type(${index + 1})` : tagName;
+            segments.unshift(segment);
 
             currentElement = currentElement.parentNode;
         }
 
-        return segments.join('/');
+        return segments.join(' ');
     }
 
     // Helper function to check if element is accepted

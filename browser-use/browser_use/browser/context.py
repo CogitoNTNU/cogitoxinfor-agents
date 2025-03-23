@@ -133,7 +133,6 @@ class BrowserContext:
 	):
 		self.context_id = str(uuid.uuid4())
 		logger.debug(f'Initializing new browser context with id: {self.context_id}')
-		print("HIIIIIIIIII", flush=True)
 
 		self.config = config
 		self.browser = browser
