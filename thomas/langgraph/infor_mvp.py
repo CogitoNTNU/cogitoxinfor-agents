@@ -11,7 +11,7 @@ from playwright.async_api import BrowserContext
 
 load_dotenv()
 API_KEY = os.getenv("LMNR_PROJECT_API_KEY")
-# Laminar.initialize(project_api_key=API_KEY)
+Laminar.initialize(project_api_key=API_KEY)
 
 llm = ChatOpenAI(model='gpt-4o')
 

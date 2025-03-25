@@ -19,7 +19,7 @@ API_KEY = os.getenv("LMNR_PROJECT_API_KEY")
 llm = ChatOpenAI(model='gpt-4o')
 
 class useBrowserOutput(BaseModel):
-    id: Optional[str] = Field(..., title="The id of the clicked element")
+    id: Optional[str] = Field(..., description="The html id of the clicked element")
     text: str = Field(..., title="The text of the clicked element")
 
 """
@@ -87,10 +87,8 @@ async def main():
         if result:
             parsed = useBrowserOutput.model_validate_json(result)
             print('--------------------------------')
-            print(f'Title: {parsed.id}')
-            print(f'URL: {parsed.text}')
-            print(f'Comments: {parsed.num_comments}')
-            print(f'Hours since post: {parsed.hours_since_post}')
+            print(f'id: {parsed.id}')
+            print(f'text: {parsed.text}')
         
         input('Press Enter to close the browser...')
         await browser.close()
