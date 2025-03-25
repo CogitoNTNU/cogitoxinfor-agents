@@ -1,0 +1,13 @@
+1. Open hamburger Bar
+
+2. Type in OIS100 in the searchbar 
+
+3. Fill inn following input values:
+Customer=TDT_126765  
+Order type=010
+Required by date=25/03/24
+
+4. Click next
+
+5. Fill in the following warehouse: 001
+ 

@@ -412,6 +412,7 @@ def generate_tests_agent():
         IMPORTANT: Your test steps and expected results MUST be specific to the actual content of the PDF. 
         Do not use generic steps like "Open the application" unless specifically mentioned in the PDF.
         Include specific field names, actions, and processes mentioned in the PDF.
+        REMEBER TO INCLUDE INPUT VALUES, ACTIONS, AND EXPECTED RESULTS BASED ON THE PDF CONTENT.
         """
         
         try:

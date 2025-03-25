@@ -39,7 +39,7 @@ async def main():
             browser_context=context
         )
 
-        with open("test.txt", "r") as file:
+        with open("output.txt", "r") as file:
             task_description = "".join(file.readlines())
         
         task_description = task_description.replace("\n", " ")
