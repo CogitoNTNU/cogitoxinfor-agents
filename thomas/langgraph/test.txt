@@ -1,0 +1,21 @@
+Generated 1 test cases:
+
+Test ID: TC001
+Title: Test Internal Sales Order Creation and Submission
+Description: This test case verifies the process of creating an internal sales order in the Infor M3 application, ensuring all required fields are validated and the order can be submitted successfully. The process follows the 'Order to Cash' procedure as described in the PDF.
+Steps:
+  1. Step 1: Enter the Customer Order Header with relevant information such as Customer, Order Type, and Required by Date.
+  2. Step 2: Perform a Credit Check to ensure the customer has sufficient credit for the order.
+  3. Step 3: Enter Customer Order Lines with specific Item(s) and quantities.
+  4. Step 4: Enter Matrix if applicable, to handle complex order configurations.
+  5. Step 5: Review the Customer Order to ensure all details are correct and complete.
+Expected Results:
+  1. Expected result for step 1: The Customer Order Header is successfully created with all required fields validated, and no errors are displayed.
+  2. Expected result for step 2: The Credit Check is completed successfully, confirming the customer's credit status is adequate for the order.
+  3. Expected result for step 3: The Customer Order Lines are entered correctly, with all items and quantities validated and accepted.
+  4. Expected result for step 4: The Matrix entry is completed without errors, and the order configuration is correctly applied.
+  5. Expected result for step 5: The Customer Order is reviewed and confirmed to be accurate, with all necessary information present, allowing for successful submission.
+Requirements:
+  - Test the process of creating an internal sales order
+  - Verify that all required fields are validated
+  - Check that the order can be submitted successfully
