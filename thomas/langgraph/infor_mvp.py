@@ -8,12 +8,20 @@ from browser_use import Agent, Browser, BrowserConfig, Controller, ActionResult
 from langchain_openai import ChatOpenAI
 from lmnr import Laminar
 from playwright.async_api import BrowserContext
-
 load_dotenv()
 API_KEY = os.getenv("LMNR_PROJECT_API_KEY")
 Laminar.initialize(project_api_key=API_KEY)
+import os
+print("Current working directory:", os.getcwd())
+print("Directory contents:", os.listdir(os.getcwd()))
 
 llm = ChatOpenAI(model='gpt-4o')
+#llm = OpenAI(
+  #  api_key=os.getenv("OPENROUTER_API_KEY"),
+  #  openai_api_base="https://openrouter.ai/api/v1",
+ #   model_name="google/gemini-2.5-pro-exp-03-25:free",
+    # You can set additional parameters if needed
+#)
 
 browser = Browser(
     config=BrowserConfig(
@@ -28,25 +36,24 @@ async def main():
     async with await browser.new_context() as context:
         login_agent = Agent(
             task="""
-            when logged in task is completed.
+            Click first element. After button clicked, wait 3 seconds. Task is now completed.
             """,
             llm=llm,
             initial_actions=[
                 {'open_tab': {'url': 'https://mingle-portal.inforcloudsuite.com/v2/ICSGDENA002_DEV/aa98233d-0f7f-4fe7-8ab8-b5b66eb494c6?favoriteContext=bookmark?OIS100%26%26%26undefined%26A%26Kundeordre.%20%C3%85pne%26OIS100%20Kundeordre.%20%C3%85pne&LogicalId=lid://infor.m3.m3prduse1b'}},
-                {"click_element": {"index": 1}}
             ],
             browser=browser,
             browser_context=context
         )
 
-        with open("output.txt", "r") as file:
-            task_description = "".join(file.readlines())
-        
-        task_description = task_description.replace("\n", " ")
-    
-        test_task = """
-            Open burdger bar on top left and type in OIS100
-        """
+        try:
+            with open("output.txt", "r") as file:
+                task_description = "".join(file.readlines())
+        except FileNotFoundError:
+            print("output.txt not found. Please ensure the file exists.")
+            task_description = ""
+            task_description = task_description.replace("\n", " ")
+            
 
         m3_agent = Agent(
             task=task_description,

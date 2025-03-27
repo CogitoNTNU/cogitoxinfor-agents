@@ -52,12 +52,11 @@ async def main():
     async with await browser.new_context() as context:
         login_agent = Agent(
             task="""
-            when logged in task is completed.
+            click first element. Wait 2 seconds then task is completed. 
             """,
             llm=llm,
             initial_actions=[
                 {'open_tab': {'url': 'https://mingle-portal.inforcloudsuite.com/v2/ICSGDENA002_DEV/aa98233d-0f7f-4fe7-8ab8-b5b66eb494c6?favoriteContext=bookmark?OIS100%26%26%26undefined%26A%26Kundeordre.%20%C3%85pne%26OIS100%20Kundeordre.%20%C3%85pne&LogicalId=lid://infor.m3.m3prduse1b'}},
-                {"click_element": {"index": 1}}
             ],
             browser=browser,
             browser_context=context

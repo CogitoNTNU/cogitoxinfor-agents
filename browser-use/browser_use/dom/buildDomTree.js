@@ -9,6 +9,10 @@
 
     function highlightElement(element, index, parentIframe = null) {
         // Create or get highlight container
+      //
+      if (element.id) {
+    console.log('Highlighting element with ID:', element.id, ' at index:', index);
+  }
         let container = document.getElementById('playwright-highlight-container');
         if (!container) {
             container = document.createElement('div');
@@ -396,7 +400,10 @@
 
         const nodeData = {
             tagName: node.tagName ? node.tagName.toLowerCase() : null,
-            attributes: {},
+            attributes: {
+              id: "my-element",
+              class: "some-class",
+            },
             xpath: node.nodeType === Node.ELEMENT_NODE ? getXPathTree(node, true) : null,
             children: [],
         };

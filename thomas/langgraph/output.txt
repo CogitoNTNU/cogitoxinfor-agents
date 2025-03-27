@@ -1,13 +1,38 @@
-1. Open hamburger Bar
-
-2. Type in OIS100 in the searchbar 
-
-3. Fill inn following input values:
-Customer=TDT_126765  
-Order type=010
-Required by date=25/03/24
-
-4. Click next
-
-5. Fill in the following warehouse: 001
- 
+Press 'Ctrl'+'S' at the same time. 
+Result: Seachbar appears
+Search for OIS100.
+Result: Program: OIS100 opens
+Enter Customer: 1337 ,Enter Req delivery date: [Todays date+2] (yy/mm/dd)
+Result: The fields are populated
+Press Enter
+Result: Alert(Confirm) appears.
+Press OK
+Result: Pop up dissapears
+Press Next three times until Panel G appears.
+Result: Panel G appears
+Enter Customer’s ord: [ABC123][IE1]
+Result: The field is populated
+Press Next 2 times until you reach Panel B1
+Result: Panel B1 opens
+Enter item: 11040, Enter Order Qty: 2, Enter Sales Price 10 and press “Add”.
+Result: Panel E opens.
+Press Next
+An orderline is entered with Lowest and Highest status 22.
+Save the order number: 0010007876 and close the program.
+OIS101 Closes
+Press CTRL+S and go to OIS300.
+OIS300 opens
+Search for the order number: 0010007876
+The Order appears
+Verify that the order status is in 22.
+The order status is in sts 22.
+Highlight order and press rightclick🡪 Press related 🡪 Delivery toolbox +43(Also possible to highlight order and press Ctrl+43.
+MWS410 appears with your orders delivery.
+Highlight order and press rightclick🡪 Related—> Picking list Ctrl+11
+MWS420 opens up with the delivery in sts 40 (PiS) – See example:
+Highlight order and press rightclick🡪 Related🡪 Confirm issues
+Panel E opens.
+Press “flagged compl” and press next a warning appears. Press next again:
+MWS420 opens again. And the status PIS has been updated to sts 90.
+Press back until you reach OIS300.
+Verify that the order sts has been updated to sts 66.

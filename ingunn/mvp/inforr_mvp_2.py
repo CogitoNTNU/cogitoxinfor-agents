@@ -77,9 +77,9 @@ async def main():
         Go to the current page and extract all <button> and <input> elements.
         For each element, return:
         - the tag name (e.g. "button" or "input")
-        - the id attribute (if present)
+        - the html id attribute (if present)
         - the name attribute (if present)
-        Return the results as a list of JSON objects with fields: tag_name, element_id, and name.
+        Return the results as a JSON objects with fields: tag_name, element_id, and name.
         """
 
         m3_agent = Agent(

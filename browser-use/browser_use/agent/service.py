@@ -361,8 +361,19 @@ class Agent:
 		logger.info(f'{emoji} Eval: {response.current_state.evaluation_previous_goal}')
 		logger.info(f'🧠 Memory: {response.current_state.memory}')
 		logger.info(f'🎯 Next goal: {response.current_state.next_goal}')
+		
 		for i, action in enumerate(response.action):
-			logger.info(f'🛠️  Action {i + 1}/{len(response.action)}: {action.model_dump_json(exclude_unset=True)}')
+			action_data = action.model_dump(exclude_unset=True)
+			# If this is a click action, try to extract an HTML id
+			html_id = None
+			if 'click_element' in action_data:
+				click_data = action_data['click_element']
+				html_id = click_data.get('html_id', None)
+			
+			if html_id is not None:
+				logger.info(f'🛠️  Action {i + 1}/{len(response.action)}: {action_data} | HTML id: {html_id}')
+			else:
+				logger.info(f'🛠️  Action {i + 1}/{len(response.action)}: {action_data}')
 
 	def _save_conversation(self, input_messages: list[BaseMessage], response: Any) -> None:
 		"""Save conversation history to file if path is specified"""
