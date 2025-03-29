@@ -2,6 +2,10 @@
 # Cogito x Infor vår 2025 - Agenter 
 
 
+
+https://github.com/user-attachments/assets/129f85b6-8a73-432b-b68b-2cc75d0b368a
+
+
 <div align="center">
 
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/CogitoNTNU/TEMPLATE-README/ci.yml)
