@@ -56,6 +56,7 @@ function markPage() {
                 var textualContent = element.textContent.trim().replace(/\s{2,}/g, " ");
                 var elementType = element.tagName.toLowerCase();
                 var ariaLabel = element.getAttribute("aria-label") || "";
+                var elementId = element.getAttribute("id") || "";
 
                 var rects = [...element.getClientRects()]
                     .filter((bb) => {
@@ -98,6 +99,7 @@ function markPage() {
                     text: textualContent,
                     type: elementType,
                     ariaLabel: ariaLabel,
+                    id: elementId,
                 };
             })
             .filter((item) => item.include && item.area >= 20);
@@ -193,6 +195,7 @@ function markPage() {
             type: item.type,
             text: item.text,
             ariaLabel: item.ariaLabel,
+            id: item.id,
         }))
     );
     return coordinates;
