@@ -50,9 +50,13 @@ function markPage() {
         var items = Array.prototype.slice
             .call(documentContext.querySelectorAll("*"))
             .map(function (element) {
+
+                //element.scrollIntoView({ block: "center", inline: "center" });
+
                 var textualContent = element.textContent.trim().replace(/\s{2,}/g, " ");
                 var elementType = element.tagName.toLowerCase();
                 var ariaLabel = element.getAttribute("aria-label") || "";
+                var elementId = element.getAttribute("id") || "";
 
                 var rects = [...element.getClientRects()]
                     .filter((bb) => {
@@ -95,6 +99,7 @@ function markPage() {
                     text: textualContent,
                     type: elementType,
                     ariaLabel: ariaLabel,
+                    id: elementId,
                 };
             })
             .filter((item) => item.include && item.area >= 20);
@@ -146,21 +151,25 @@ function markPage() {
         return color;
     }
 
-    // Create floating borders for all items
+    var bodyRect = document.body.getBoundingClientRect();
+
     items.forEach(function (item, index) {
         item.rects.forEach((bbox) => {
+            var adjustedLeft = bbox.left - bodyRect.left;
+            var adjustedTop = bbox.top - bodyRect.top;
+    
             var newElement = document.createElement("div");
             var borderColor = getRandomColor();
             newElement.style.outline = `2px dashed ${borderColor}`;
             newElement.style.position = "fixed";
-            newElement.style.left = bbox.left + "px";
-            newElement.style.top = bbox.top + "px";
+            newElement.style.left = adjustedLeft + "px";
+            newElement.style.top = adjustedTop + "px";
             newElement.style.width = bbox.width + "px";
             newElement.style.height = bbox.height + "px";
             newElement.style.pointerEvents = "none";
             newElement.style.boxSizing = "border-box";
             newElement.style.zIndex = 2147483647;
-
+    
             // Add floating label at the corner
             var label = document.createElement("span");
             label.textContent = index;
@@ -186,6 +195,7 @@ function markPage() {
             type: item.type,
             text: item.text,
             ariaLabel: item.ariaLabel,
+            id: item.id,
         }))
     );
     return coordinates;
