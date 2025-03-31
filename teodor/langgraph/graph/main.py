@@ -21,6 +21,7 @@ async def test_agent(query: str, config: dict = config):
     playwright = await async_playwright().start()
     browser = await playwright.chromium.launch(
         executable_path="/usr/bin/chromium-browser",
+        #executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',  # macOS path
         headless=False,  # Set to False to watch the agent navigate
         args=[
             '--no-sandbox',
