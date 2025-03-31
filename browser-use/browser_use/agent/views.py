@@ -32,6 +32,7 @@ class ActionResult(BaseModel):
 	extracted_content: Optional[str] = None
 	error: Optional[str] = None
 	include_in_memory: bool = False  # whether to include in past messages as context or not
+	html_id: Optional[str] = None  # HTML id of interacted element if available
 
 
 class AgentBrain(BaseModel):

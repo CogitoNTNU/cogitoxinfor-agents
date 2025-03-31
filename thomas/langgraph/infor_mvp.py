@@ -36,7 +36,7 @@ async def main():
     async with await browser.new_context() as context:
         login_agent = Agent(
             task="""
-            Click first element. After button clicked, wait 3 seconds. Task is now completed.
+            Click the first account. After button clicked, wait 3 seconds. Task is now completed.
             """,
             llm=llm,
             initial_actions=[

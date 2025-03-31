@@ -457,10 +457,15 @@ class Agent:
 						if not await self._validate_output():
 							continue
 
-					logger.info('✅ Task completed successfully')
+					logger.info('✅ Task completed successfully - stopping immediately')
 					if self.register_done_callback:
 						self.register_done_callback(self.history)
-					break
+					self._stopped = True
+					# Force exit the run loop immediately
+					await self.browser_context.close()
+					if not self.injected_browser and self.browser:
+						await self.browser.close()
+					return self.history
 			else:
 				logger.info('❌ Failed to complete task in maximum steps')
 
