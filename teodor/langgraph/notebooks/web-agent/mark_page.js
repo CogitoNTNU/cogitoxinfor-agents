@@ -102,7 +102,7 @@ function markPage() {
                     id: elementId,
                 };
             })
-            .filter((item) => item.include && item.area >= 20);
+            .filter((item) => item.include && item.area >= 10);
 
         // Only keep inner clickable items
         items = items.filter(
