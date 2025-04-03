@@ -22,17 +22,55 @@ document.head.append(styleTag);
 let labels = [];
 
 function unmarkPage() {
-// Unmark page logic
-for (const label of labels) {
-document.body.removeChild(label);
+    // Unmark page logic
+    for (const label of labels) {
+        document.body.removeChild(label);
+    }
+    labels = [];
 }
-labels = [];
-}
-
-
 
 function markPage() {
     unmarkPage();
+    
+    // Function to temporarily reveal hidden elements for detection
+    function temporarilyRevealHidden() {
+        const hiddenElements = [];
+        
+        // Find all elements with hidden attribute or display:none
+        document.querySelectorAll('[hidden], [aria-hidden="true"]').forEach(el => {
+            if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true' || 
+                window.getComputedStyle(el).display === 'none') {
+                
+                hiddenElements.push({
+                    element: el,
+                    wasHidden: el.hasAttribute('hidden'),
+                    ariaHidden: el.getAttribute('aria-hidden'),
+                    display: el.style.display
+                });
+                
+                // Temporarily make visible but keep opacity 0 to prevent flashing
+                if (el.hasAttribute('hidden')) el.removeAttribute('hidden');
+                if (el.getAttribute('aria-hidden') === 'true') el.setAttribute('aria-hidden', 'false');
+                el.style.display = 'block';
+                el.style.opacity = '0';
+            }
+        });
+        
+        return hiddenElements;
+    }
+    
+    // Restore hidden elements to their original state
+    function restoreHiddenElements(hiddenElements) {
+        hiddenElements.forEach(item => {
+            if (item.wasHidden) item.element.setAttribute('hidden', '');
+            if (item.ariaHidden === 'true') item.element.setAttribute('aria-hidden', 'true');
+            item.element.style.display = item.display;
+            item.element.style.opacity = '';
+        });
+    }
+    
+    // Temporarily make hidden elements visible for detection
+    const hiddenElements = temporarilyRevealHidden();
 
     var bodyRect = document.body.getBoundingClientRect();
 
@@ -107,6 +145,7 @@ function markPage() {
                     var area = rects.reduce((acc, rect) => acc + rect.width * rect.height, 0);
 
                     return {
+                        // Use the element itself as the reference point
                         element: element,
                         include:
                             element.tagName === "INPUT" ||
@@ -118,6 +157,30 @@ function markPage() {
                             (window.getComputedStyle(element).cursor === "pointer") ||
                             element.tagName === "IFRAME" ||
                             element.tagName === "VIDEO" ||
+                            // Enhanced detection for modern UI frameworks and ARIA components
+                            element.getAttribute?.("role") === "button" ||
+                            element.getAttribute?.("role") === "option" ||
+                            element.getAttribute?.("role") === "combobox" ||
+                            element.getAttribute?.("role") === "search" ||
+                            element.getAttribute?.("role") === "listbox" ||
+                            element.getAttribute?.("aria-selected") === "true" ||
+                            // Detect more dropdown/suggestion items
+                            element.id?.includes?.("headlessui-combobox-option") ||
+                            element.tagName === "LI" && (element.classList.contains("cursor-pointer") || 
+                                                        element.getAttribute?.("aria-label")) ||
+                            element.tagName === "A" && element.closest?.("li")?.classList?.contains("cursor-pointer") ||
+                            // Improve selection of hidden elements that could become visible
+                            (element.getAttribute?.("data-headlessui-state")?.includes("active") ||
+                             element.getAttribute?.("data-headlessui-state")?.includes("selected")) ||
+                            (element.getAttribute?.("data-headlessui-state") !== null && 
+                             element.getAttribute?.("data-headlessui-state") !== "") ||
+                            (element.getAttribute?.("type") === "search") ||
+                            // Additional dropdown suggestion elements
+                            (element.closest?.('[role="listbox"]') && 
+                             (element.getAttribute?.("role") === "option" || element.tagName === "LI")) ||
+                            // Elements within a combobox
+                            (element.closest?.('[role="combobox"]') && 
+                             element.tagName === "LI" && element.querySelector?.("a, button")) ||
                             elementType === "search-newfrontier-podlet-isolated", // Special case for finn.no
                         area,
                         rects,
@@ -217,6 +280,23 @@ function markPage() {
     // Make sure items is always an array
     items = items || [];
 
+    // Sort items in a deterministic way - by vertical position (top to bottom) then horizontal (left to right)
+    items.sort((a, b) => {
+        // Get the topmost rect from each item
+        const aTop = Math.min(...a.rects.map(r => r.top));
+        const bTop = Math.min(...b.rects.map(r => r.top));
+        
+        // First sort by vertical position (top coordinate)
+        if (Math.abs(aTop - bTop) > 10) { // Use a small threshold to group elements in roughly the same row
+            return aTop - bTop;
+        }
+        
+        // If they're in the same row, sort by left coordinate
+        const aLeft = Math.min(...a.rects.map(r => r.left));
+        const bLeft = Math.min(...b.rects.map(r => r.left));
+        return aLeft - bLeft;
+    });
+
     items.forEach(function (item, index) {
         item.rects.forEach((bbox) => {
             var adjustedLeft = bbox.left - bodyRect.left;
@@ -251,6 +331,9 @@ function markPage() {
             labels.push(newElement);
         });
     });
+
+    // Restore hidden elements to their original state
+    restoreHiddenElements(hiddenElements);
 
     // Ensure coordinates is always an array
     const coordinates = items.length ? items.flatMap((item) =>
