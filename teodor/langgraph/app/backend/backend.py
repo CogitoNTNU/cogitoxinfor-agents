@@ -10,29 +10,36 @@ import ssl
 from fastapi.responses import JSONResponse
 import sys
 import os
+import base64
 
 # Add this to include graph directory for local imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Use direct imports from the graph module
-from graph.main import test_agent
+from graph.main import test_agent, run_agent
+from graph.browser import initialize_browser, close_browser
+from graph.models import InputState, Prediction
 
 app = FastAPI(title="LLM Agent API")
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://localhost:3000", "*"],  # Your Next.js frontend URLs
+    allow_origins=["http://localhost:3000", "https://localhost:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Message types - keep in sync with frontend
+# Enhanced message types to include agent events
 MESSAGE_TYPES = {
     "SEND_QUERY": "SEND_QUERY",
     "SESSION_UPDATE": "SESSION_UPDATE",
     "SESSION_COMPLETED": "SESSION_COMPLETED",
+    "ACTION_UPDATE": "ACTION_UPDATE",  # For agent actions
+    "SCREENSHOT_UPDATE": "SCREENSHOT_UPDATE",  # For webpage screenshots
+    "HUMAN_INTERVENTION_REQUEST": "HUMAN_INTERVENTION_REQUEST",  # Request user input
+    "HUMAN_INTERVENTION_RESPONSE": "HUMAN_INTERVENTION_RESPONSE",  # User response
     "ERROR": "ERROR",
 }
 
@@ -54,6 +61,7 @@ class WebSocketMessage(BaseModel):
 # Store active sessions and their results
 active_sessions = {}
 session_results = {}
+intervention_callbacks = {}  # Store callback functions for human intervention
 
 # Connection manager for WebSocket connections
 class ConnectionManager:
@@ -115,7 +123,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         continue
                     
                     # Create a new session
-                    session_id = client_id
+                    session_id = str(uuid.uuid4())
                     manager.register_session(client_id, session_id)
                     
                     # Create request object
@@ -124,8 +132,14 @@ async def websocket_endpoint(websocket: WebSocket):
                         testing=payload.get("testing", False),
                         test_actions=payload.get("test_actions"),
                         human_intervention=payload.get("human_intervention", False),
-                        config=payload.get("config")
+                        config=payload.get("config", {})
                     )
+                    
+                    # Add client_id to config for WebSocket communication
+                    if not request.config:
+                        request.config = {}
+                    request.config["websocket_client_id"] = client_id
+                    request.config["session_id"] = session_id
                     
                     # Store request in active sessions
                     active_sessions[session_id] = request
@@ -141,6 +155,28 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                     # Process the session in the background
                     asyncio.create_task(process_session(session_id))
+                
+                elif message_type == MESSAGE_TYPES["HUMAN_INTERVENTION_RESPONSE"]:
+                    # Handle user response to intervention request
+                    session_id = payload.get("session_id")
+                    response = payload.get("response")
+                    
+                    # Get the callback for this session
+                    callback = intervention_callbacks.get(session_id)
+                    if callback:
+                        # Call the callback with the user's response
+                        await callback(response)
+                        # Remove the callback
+                        del intervention_callbacks[session_id]
+                        
+                        # Send update to client
+                        await manager.send_personal_message(
+                            client_id,
+                            {
+                                "type": MESSAGE_TYPES["SESSION_UPDATE"],
+                                "payload": {"session_id": session_id, "status": "processing"}
+                            }
+                        )
             
             except json.JSONDecodeError as e:
                 await manager.send_personal_message(
@@ -161,7 +197,80 @@ async def websocket_endpoint(websocket: WebSocket):
         print(f"Unexpected WebSocket error: {str(e)}")
         manager.disconnect(client_id)
 
-# Process a single session and send updates via WebSocket
+# Custom event handler for agent events
+async def handle_agent_event(event, session_id, client_id, step_number):
+    """Process an agent event and send updates to the client"""
+    
+    # Handle screenshot updates
+    if "format_elements" in event and "img" in event["format_elements"]:
+        image = event["format_elements"]["img"]
+        await manager.send_personal_message(
+            client_id,
+            {
+                "type": MESSAGE_TYPES["SCREENSHOT_UPDATE"],
+                "payload": {
+                    "session_id": session_id,
+                    "screenshot": image,
+                    "step": step_number
+                }
+            }
+        )
+    
+    # Handle agent actions
+    if "agent" in event:
+        pred = event["agent"].get("prediction") or {}
+        action = pred.action if hasattr(pred, "action") else None
+        action_input = pred.args if hasattr(pred, "args") else None
+        
+        if action:
+            # Send action update to client
+            action_message = {
+                "type": MESSAGE_TYPES["ACTION_UPDATE"],
+                "payload": {
+                    "session_id": session_id,
+                    "action": action,
+                    "args": action_input,
+                    "step": step_number
+                }
+            }
+            
+            # Add screenshot if available
+            if "format_elements" in event and "img" in event["format_elements"]:
+                action_message["payload"]["screenshot"] = event["format_elements"]["img"]
+                
+            await manager.send_personal_message(client_id, action_message)
+
+# Handle human intervention requests
+async def request_human_intervention(message, session_id, client_id, screenshot=None):
+    """Request human input and return the response"""
+    
+    # Create a future to store the response
+    future = asyncio.Future()
+    
+    # Store the callback that will resolve the future
+    async def callback(response):
+        future.set_result(response)
+    
+    # Register the callback
+    intervention_callbacks[session_id] = callback
+    
+    # Send intervention request to client
+    await manager.send_personal_message(
+        client_id,
+        {
+            "type": MESSAGE_TYPES["HUMAN_INTERVENTION_REQUEST"],
+            "payload": {
+                "session_id": session_id,
+                "message": message,
+                "screenshot": screenshot
+            }
+        }
+    )
+    
+    # Wait for the response
+    return await future
+
+# Process a single session with enhanced event handling
 async def process_session(session_id: str):
     request = active_sessions.get(session_id)
     client_id = manager.get_client_for_session(session_id)
@@ -169,19 +278,72 @@ async def process_session(session_id: str):
     if not request or not client_id:
         return
     
+    playwright = None
+    context = None
+    page = None
+    
     try:
-        print("request: ", request)
-        # Process the request with the agent
-        result = await test_agent(
+        # Initialize browser
+        playwright, context, page = await initialize_browser()
+        
+        # Prepare config
+        if not request.config:
+            request.config = {}
+        
+        # Add custom event handler
+        steps = []
+        
+        # Custom event handler function that integrates with WebSockets
+        async def custom_event_handler(event):
+            step_number = len(steps)
+            
+            # Process event directly (similar to run_agent logic but sending events to client)
+            if "__interrupt__" in event:
+                interrupt_info = event["__interrupt__"][0]
+                message = interrupt_info.value
+                
+                # Get screenshot if available
+                screenshot = None
+                if "format_elements" in event and "img" in event["format_elements"]:
+                    screenshot = event["format_elements"]["img"]
+                
+                # Request human intervention
+                user_input = await request_human_intervention(message, session_id, client_id, screenshot)
+                
+                # Return a Command to resume execution
+                from langgraph.types import Command
+                return Command(resume=user_input)
+            
+            # Otherwise, process normal event updates
+            await handle_agent_event(event, session_id, client_id, step_number)
+            
+            if "agent" in event:
+                pred = event["agent"].get("prediction") or {}
+                action = pred.action if hasattr(pred, "action") else None
+                action_input = pred.args if hasattr(pred, "args") else None
+                
+                if action:
+                    # Add to steps for tracking
+                    steps.append(f"{len(steps) + 1}. {action}: {action_input}")
+            
+            # Return None to continue normal processing
+            return None
+        
+        # Add the custom event handler to config
+        request.config["event_handler"] = custom_event_handler
+        
+        # Process the request with direct run_agent call
+        final_answer = await run_agent(
+            page=page,
             query=request.query,
+            config=request.config,
             testing=request.testing,
             test_actions=request.test_actions,
-            human_intervention=request.human_intervention,
-            config=request.config
+            human_intervention=request.human_intervention
         )
         
         # Store the result
-        session_results[session_id] = result
+        session_results[session_id] = final_answer
         # Remove from active sessions
         del active_sessions[session_id]
         
@@ -190,7 +352,7 @@ async def process_session(session_id: str):
             client_id,
             {
                 "type": MESSAGE_TYPES["SESSION_COMPLETED"],
-                "payload": {"session_id": session_id, "result": result}
+                "payload": {"session_id": session_id, "result": final_answer}
             }
         )
         
@@ -211,6 +373,11 @@ async def process_session(session_id: str):
                     "payload": {"session_id": session_id, "message": error_message}
                 }
             )
+    finally:
+        # Clean up browser resources
+        await close_browser(playwright, context)
+
+# Keep existing REST API endpoints for backward compatibility...
 
 # --- Keep existing REST API endpoints for backward compatibility ---
 

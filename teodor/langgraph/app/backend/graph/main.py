@@ -6,8 +6,9 @@ import os
 import asyncio
 from dotenv import load_dotenv
 
+from langgraph.types import Command
 from .tools import CLICK, TYPE, SCROLL, WAIT, NAVIGATE
-from .models import InputState
+from .models import InputState, Prediction
 from .browser import initialize_browser, close_browser
 
 # Load environment variables
@@ -84,108 +85,124 @@ async def run_agent(
         test_actions=predictions,
         human_intervention=human_intervention,
     )
-    
-    # Get the graph
+
     graph = get_graph_with_config(config)
     thread_config = config["configurable"]
-    
-    # Initialize results
-    final_answer = None
-    steps = []
+    config["configurable"]["page"] = page
     try:
-        # Start the event stream
-        event_stream = graph.astream(state, config=thread_config)
-    
+        final_answer = None
+        steps = []
         
-        async for event in event_stream:
-            #print(event)
-            step_number = len(steps)
-            display.clear_output(wait=True)
-            
-            # Process format_elements event (contains image)
-            if "format_elements" in event:
-                image = event["format_elements"]["img"]
-                # Display the image
-                display.display(display.Image(base64.b64decode(image)))
-                # Save image with step number
-                save_image_to_history(image, "webpage.png", step_number)
-            
-            if "human_intervention" in event:
-                print("interrupt")
-                interrupt_data = event["interrupt"]
-                
-                print("\n--- HUMAN INTERVENTION REQUIRED ---")
-                
-                # Display bounding boxes if present
-                if "Bboxes_from_page" in interrupt_data:
-                    bboxes = interrupt_data["Bboxes_from_page"]
-                    print(f"Available elements ({len(bboxes)}):")
+        # Initial graph input
+        current_input = state
+        
+        while True:
+            event_stream = graph.astream(current_input, config=thread_config)
+            # Reset current_input for next potential interrupt
+            current_input = None
+            stream_finished = False
+            answer_found = False
+            try:
+                async for event in event_stream:
+                    # Only clear output when it's NOT an interrupt event
+                    if "__interrupt__" not in event:
+                        display.clear_output(wait=True)            
                     
-                    # Display each element with an index
-                    for i, bbox in enumerate(bboxes):
-                        element_type = bbox.get("tag", "element")
-                        text = bbox.get("text", "")[:50]  # Limit text length for display
-                        print(f"  [{i}] {element_type}: {text}")
+                    # Check if there's an interrupt in the event
+                    if "__interrupt__" in event:
+                        interrupt_info = event["__interrupt__"][0]
+                        message = interrupt_info.value
+                        
+                        print("\n" + "=" * 50)
+                        print(f"🔔 HUMAN INPUT REQUIRED:")
+                        print(f"Agent is requesting approval: {message}")
+                        print("=" * 50 + "\n")
+                        
+                        # Small delay to ensure message is visible before the input prompt appears
+                        await asyncio.sleep(0.2)
+                        
+                        user_input = input(
+                            f"""
+                            Agent is requesting approval: {message}
+                            \nClick 'ENTER' to approve or provide alternative instructions, pass the element id you want to invoke: """
+                            )
+                                     
+                        # Create a Command to resume execution
+                        current_input = Command(resume=user_input)
+                        break  # Exit the event loop to process the command
                     
-                    # Get user input
-                    while True:
-                        try:
-                            choice = input("\nEnter element number to select: ")
-                            selected_index = int(choice)
-                            if 0 <= selected_index < len(bboxes):
+                    # Process normal event updates
+                    step_number = len(steps)
+                    if "format_elements" in event:
+                        image = event["format_elements"]["img"]
+                        # Update only the image using the display ID
+                        display.display(display.Image(base64.b64decode(image)))
+                        # Save image with step number
+                        save_image_to_history(image, "webpage.png", step_number)
+
+                    if "agent" in event:
+                        pred = event["agent"].get("prediction") or {}
+                        action = pred.action if hasattr(pred, "action") else None
+                        action_input = pred.args if hasattr(pred, "args") else None
+                        
+                        if action:
+                            action_message = {
+                                "type": "ACTION_UPDATE",
+                                "action": action,
+                                "args": action_input,
+                                "step": len(steps)
+                            }
+                            # Add to steps and display updated text
+                            steps.append(f"{len(steps) + 1}. {action}: {action_input}")
+                            print(f"\n--- Agent Event ---")
+                            print(f"Action: {action}")
+                            print(f"Action Input: {action_input}")
+                            print("\n".join(steps))
+                            
+                            if action == "ANSWER":
+                                # Save final screenshot with special name
+                                if "format_elements" in event and "img" in event["format_elements"]:
+                                    save_image_to_history(event["format_elements"]["img"], "final_webpage.png")
+                                print(f"\nFinal answer: {action_input[0]}")
+                                final_answer = action_input[0]
+                                answer_found = True
                                 break
-                            else:
-                                print(f"Please enter a number between 0 and {len(bboxes)-1}")
-                        except ValueError:
-                            print("Please enter a valid number")
                 
-                # Handle other types of interrupts if needed
-                else:
-                    print("Intervention required:")
-                    print(interrupt_data)
-                    selected_index = int(input("Enter your choice: "))
+                # If we've processed all events without interruption or finding an answer
+                stream_finished = True
                 
-                print(f"Selected option: {selected_index}")
-                
-                # Resume execution with the selected choice
-                event_stream = graph.astream(
-                    Command(resume=selected_index),
-                    config=config["configurable"]
-                )
-                continue
-
-            # Skip if no agent event
-            if "agent" not in event:
-                continue
-
-            # Get prediction from agent event
-            pred = event["agent"].get("prediction") or {}
-            action = pred.action
-            action_input = pred.args
+            except Exception as e:
+                print(f"Error during stream processing: {e}")
+                break  # Exit on error
             
-            # Add to steps and display updated text
-            steps.append(f"{len(steps) + 1}. {action}: {action_input}")
-            print(f"\n--- Agent Event ---")
-            print(f"Action: {action}")
-            print(f"Action Input: {action_input}")
-            print("\n".join(steps))
-            
-            # Handle ANSWER action
-            if action == "ANSWER":
-                # Save final screenshot with special name
-                if "format_elements" in event and "img" in event["format_elements"]:
-                    save_image_to_history(image, "final_webpage.png")
-                print(f"\nFinal answer: {action_input[0]}")
-                final_answer = action_input[0]
+            # If we found an answer, we're done
+            if answer_found:
                 break
                 
-        print("Agent completed successfully.")
+            # If the stream finished normally (no interrupts) and we don't have new input to process, we're done
+            if stream_finished and not current_input:
+                # Check if we need to continue due to state of the graph
+                state = graph.get_state(config)
+                if not state or not hasattr(state, 'test_actions') or not state.test_actions:
+                    print("No more actions to test, finishing.")
+                    break
+                    
+                # If we got here, keep processing the next cycle without user interaction
+                print("Continuing to next test action automatically.")
+                continue
+                
+            # If we have a command to process, continue the loop; otherwise exit
+            if not current_input:
+                print("Processing complete - no more actions to take.")
+                break
+                
+        print("Agent execution completed successfully.")
         print(f"All screenshots saved to: {history_dir}")
         
-        return final_answer
     except Exception as e:
         print(f"Error during agent execution: {str(e)}")
         raise
+    return final_answer
 
 
 

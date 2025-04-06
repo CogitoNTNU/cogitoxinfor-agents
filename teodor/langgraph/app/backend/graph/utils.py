@@ -8,6 +8,7 @@ import shutil
 from playwright.async_api import Page
 from langchain_core.runnables import chain as chain_decorator
 from .models import AgentState, BBox
+from langchain_core.messages import SystemMessage
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 file = os.path.join(current_dir, "mark_page.js")
@@ -18,6 +19,7 @@ with open(file) as f:
     # to take a screenshot of the page, select the
     # elements to annotate, and add bounding boxes
     mark_page_script = f.read()
+
 
 @chain_decorator
 async def mark_page(page):
@@ -56,13 +58,7 @@ async def mark_page(page):
     
         # Take a screenshot of the page
         screenshot = await page.screenshot()
-
-        # Try to remove annotations but don't fail if it doesn't work
-        try:
-            await page.evaluate("unmarkPage()")
-        except Exception as e:
-            print(f"Warning: Failed to unmark page: {e}")
-
+        
         return {
             "img": base64.b64encode(screenshot).decode(),
             "bboxes": bboxes,
@@ -83,11 +79,11 @@ async def annotate(state: AgentState, config):
         page = config["configurable"].get("page")
         
         # Debug the URL we're annotating
-        print(f"📝 Annotating page: {page.url}")
+        if state.DEBUG: print(f"📝 Annotating page: {page.url}")
         
         # Annotate the page and get bounding boxes
         marked_page = await mark_page.with_retry().ainvoke(page)
-        print(f"✅ Found {len(marked_page['bboxes'])} bounding boxes")
+        if state.DEBUG: print(f"✅ Found {len(marked_page['bboxes'])} bounding boxes")
 
         # Set the annotated image and bounding boxes in the state
         state.img = marked_page["img"]
@@ -143,15 +139,19 @@ def format_elements(state: AgentState) -> AgentState:
     
     return state
 
-def update_scratchpad(state: AgentState) -> AgentState:
+async def update_scratchpad(state: AgentState, config) -> AgentState:
     """
     Updates scratchpad with:
     1. Current observation at the top
     2. Any warnings immediately after
     3. Previous observations in reverse chronological order
-    """
-    from langchain_core.messages import SystemMessage
-    
+    """    
+    try:
+        page = config["configurable"].get("page")
+        await page.evaluate("unmarkPage()")
+    except Exception as e:
+        print(f"Warning: Failed to unmark page: {e}")
+
     # Start with an empty scratchpad
     state.scratchpad = []
     

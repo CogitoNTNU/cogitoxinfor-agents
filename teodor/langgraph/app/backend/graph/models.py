@@ -62,6 +62,7 @@ class AgentState(BaseModel):
     repeated_failures: Optional[int] = Field(default=0, description="Count of repeated failures for the current action")
     human_intervention: bool = False
     selected_bbox: Optional[BBox] = None
+    DEBUG: bool = True
 
     def add_observation(self, action: str, status: str, details: str) -> None:
         """Add a new observation to the history"""
@@ -101,6 +102,7 @@ class InputState(BaseModel):
     page: Optional[Page] = Field(default=None, exclude=True)  # Non-serializable Playwright page object
     test_actions: Optional[List[Prediction]] = Field(default_factory=list, description="The action to be tested")
     human_intervention: bool = False
+    DEBUG: bool = True
 
     class Config:
         # Exclude the `page` attribute during serialization

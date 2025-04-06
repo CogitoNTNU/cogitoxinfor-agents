@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Next.js Chat Application
 
-## Getting Started
+This is a simple chat application built using Next.js. It utilizes WebSocket for real-time communication and provides a responsive layout that adapts to different screen sizes.
 
-First, run the development server:
+## Project Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+The project is organized as follows:
+
+```
+nextjs-chat-app
+├── app
+│   ├── favicon.ico          # Favicon for the application
+│   ├── globals.css          # Global CSS styles
+│   ├── layout.js            # Layout component for consistent structure
+│   ├── page.js              # Main entry point for the application
+│   └── app
+│       └── chat
+│           └── page.js      # Chat page component
+├── contexts
+│   ├── ViewportContext.js    # Context provider for viewport-related state
+│   └── WebSocketContext.js    # Context provider for WebSocket connections
+├── services
+│   └── websocket.js          # Functions for handling WebSocket connections
+├── public                    # Directory for static assets
+├── .gitignore                # Files and directories to ignore by Git
+├── eslint.config.mjs        # ESLint configuration
+├── next.config.js           # Next.js application configuration
+├── package.json              # npm configuration file
+├── postcss.config.mjs       # PostCSS configuration
+└── README.md                 # Documentation for the project
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+To get started with the project, follow these steps:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Clone the repository:
+   ```
+   git clone <repository-url>
+   ```
 
-## Learn More
+2. Navigate to the project directory:
+   ```
+   cd nextjs-chat-app
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+3. Install the dependencies:
+   ```
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Usage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+To run the application in development mode, use the following command:
 
-## Deploy on Vercel
+```
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This will start the Next.js development server, and you can view the application in your browser at `http://localhost:3000`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Features
+
+- Real-time chat functionality using WebSocket.
+- Responsive design that adapts to different screen sizes.
+- Context API for managing global state related to viewport and WebSocket connections.
+
+## Contributing
+
+Contributions are welcome! If you have suggestions for improvements or new features, feel free to open an issue or submit a pull request.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for more details.
