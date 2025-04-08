@@ -87,6 +87,14 @@ class Controller:
             logger.info(msg)
             return ActionResult(extracted_content=msg, include_in_memory=True)
 
+        @self.registry.action('Send keys', param_model=SendKeysAction, requires_browser=True)
+        async def send_keys(params: SendKeysAction, browser: BrowserContext):
+            page = await browser.get_current_page()
+            await page.keyboard.press(params.keys)
+            msg = f'⌨️  Sent keys: {params.keys}'
+            logger.info(msg)
+            return ActionResult(extracted_content=msg, include_in_memory=True)
+
         # Element Interaction Actions
         @self.registry.action('Click element', param_model=ClickElementAction, requires_browser=True)
         async def click_element(params: ClickElementAction, browser: BrowserContext):
