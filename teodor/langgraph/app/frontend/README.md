@@ -1,74 +1,73 @@
-# Next.js Chat Application
+# Welcome to your Lovable project
 
-This is a simple chat application built using Next.js. It utilizes WebSocket for real-time communication and provides a responsive layout that adapts to different screen sizes.
+## Project info
 
-## Project Structure
+**URL**: https://lovable.dev/projects/a61d33c0-ef0b-4b2a-8dd2-7af5dbb5befe
 
-The project is organized as follows:
+## How can I edit this code?
 
-```
-nextjs-chat-app
-├── app
-│   ├── favicon.ico          # Favicon for the application
-│   ├── globals.css          # Global CSS styles
-│   ├── layout.js            # Layout component for consistent structure
-│   ├── page.js              # Main entry point for the application
-│   └── app
-│       └── chat
-│           └── page.js      # Chat page component
-├── contexts
-│   ├── ViewportContext.js    # Context provider for viewport-related state
-│   └── WebSocketContext.js    # Context provider for WebSocket connections
-├── services
-│   └── websocket.js          # Functions for handling WebSocket connections
-├── public                    # Directory for static assets
-├── .gitignore                # Files and directories to ignore by Git
-├── eslint.config.mjs        # ESLint configuration
-├── next.config.js           # Next.js application configuration
-├── package.json              # npm configuration file
-├── postcss.config.mjs       # PostCSS configuration
-└── README.md                 # Documentation for the project
-```
+There are several ways of editing your application.
 
-## Installation
+**Use Lovable**
 
-To get started with the project, follow these steps:
+Simply visit the [Lovable Project](https://lovable.dev/projects/a61d33c0-ef0b-4b2a-8dd2-7af5dbb5befe) and start prompting.
 
-1. Clone the repository:
-   ```
-   git clone <repository-url>
-   ```
+Changes made via Lovable will be committed automatically to this repo.
 
-2. Navigate to the project directory:
-   ```
-   cd nextjs-chat-app
-   ```
+**Use your preferred IDE**
 
-3. Install the dependencies:
-   ```
-   npm install
-   ```
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-## Usage
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-To run the application in development mode, use the following command:
+Follow these steps:
 
-```
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
+
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
+
+# Step 3: Install the necessary dependencies.
+npm i
+
+# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-This will start the Next.js development server, and you can view the application in your browser at `http://localhost:3000`.
+**Edit a file directly in GitHub**
 
-## Features
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
 
-- Real-time chat functionality using WebSocket.
-- Responsive design that adapts to different screen sizes.
-- Context API for managing global state related to viewport and WebSocket connections.
+**Use GitHub Codespaces**
 
-## Contributing
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
 
-Contributions are welcome! If you have suggestions for improvements or new features, feel free to open an issue or submit a pull request.
+## What technologies are used for this project?
 
-## License
+This project is built with:
 
-This project is licensed under the MIT License. See the LICENSE file for more details.
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
+
+## How can I deploy this project?
+
+Simply open [Lovable](https://lovable.dev/projects/a61d33c0-ef0b-4b2a-8dd2-7af5dbb5befe) and click on Share -> Publish.
+
+## Can I connect a custom domain to my Lovable project?
+
+Yes it is!
+
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
