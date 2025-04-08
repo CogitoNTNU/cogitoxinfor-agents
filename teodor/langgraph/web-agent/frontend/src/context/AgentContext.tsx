@@ -101,32 +101,50 @@ export const AgentProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     config?: AgentConfig
   ) => {
     resetSession();
-    setSessionId(newSessionId);
     
-    const connected = await websocketService.connect(newSessionId);
-    
-    if (connected) {
-      setIsConnected(true);
-      setIsRunning(true);
-      
-      // Send configuration along with the query
-      websocketService.sendMessage({
-        type: 'START_AGENT',
-        session_id: newSessionId,
-        query: query,
-        config: {
+    try {
+      // 1. First call the API to create a session
+      const response = await fetch('http://localhost:8000/api/agent/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: query,
           testing: config?.testing || false,
-          test_actions: config?.test_actions?.map(a => [a.action, a.args]) || [],
-          human_intervention: config?.human_intervention !== undefined ? config.human_intervention : true
-        }
+          human_intervention: config?.human_intervention !== undefined ? config.human_intervention : true,
+          test_actions: config?.test_actions || []
+        })
       });
       
-      toast.info("Agent started", {
-        description: "Connected and running"
-      });
-    } else {
-      toast.error("Connection failed", {
-        description: "Could not connect to agent"
+      if (!response.ok) {
+        throw new Error(`API responded with status: ${response.status}`);
+      }
+      
+      // 2. Get session ID from response
+      const data = await response.json();
+      const sessionId = data.session_id;
+      
+      // 3. Now connect to WebSocket with this session ID
+      setSessionId(sessionId);
+      const connected = await websocketService.connect(sessionId);
+      
+      if (connected) {
+        setIsConnected(true);
+        setIsRunning(true);
+        
+        toast.info("Agent started", {
+          description: "Connected and running"
+        });
+      } else {
+        toast.error("Connection failed", {
+          description: "Could not connect to agent"
+        });
+      }
+    } catch (error) {
+      console.error("Error starting agent:", error);
+      toast.error("Failed to start agent", {
+        description: error.message || "An unexpected error occurred"
       });
     }
   };

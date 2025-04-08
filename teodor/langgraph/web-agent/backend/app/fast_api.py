@@ -12,10 +12,8 @@ from pydantic import BaseModel
 
 # No need for sys.path.append since the graph is now local
 # Import from the local graph implementation
-from .graph.models import InputState, Prediction
 from .graph.browser import initialize_browser, close_browser
 from .graph.main import run_agent as langgraph_run_agent
-from .graph.graph import get_graph_with_config
 from .capture_dom import capture_dom
 
 app = FastAPI(title="Web Automation API")
@@ -99,23 +97,24 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         # Get session parameters
         session = active_sessions[session_id]
         
-        # Send initial message
-        await websocket.send_json({
-            "type": "STATUS_UPDATE", 
-            "payload": {"status": "starting", "message": "Initializing browser..."}
-        })
+        # # Send initial message
+        # await websocket.send_json({
+        #     "type": "STATUS_UPDATE", 
+        #     "payload": {"status": "starting", "message": "Initializing browser..."}
+        # })
         
         # Define callback for sending events
         async def event_callback(event_data):
+            print(f"Event callback triggered with data: {event_data}")
             await websocket.send_json(event_data)
             # After certain events, send a DOM update
-            if event_data.get("type") in ["ACTION_UPDATE", "SCREENSHOT_UPDATE"]:
-                if page:
-                    dom_data = await capture_dom(page)
-                    await websocket.send_json({
-                        "type": "DOM_UPDATE", 
-                        "payload": dom_data
-                    })
+            # if event_data.get("type") in ["ACTION_UPDATE", "SCREENSHOT_UPDATE"]:
+            #     if page:
+            #         dom_data = await capture_dom(page)
+            #         await websocket.send_json({
+            #             "type": "DOM_UPDATE", 
+            #             "payload": dom_data
+            #         })
         
         # Background task to handle WebSocket messages from client
         async def handle_client_messages():
@@ -124,6 +123,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     data = await websocket.receive_json()
                     if data.get("type") == "INTERVENTION_RESPONSE" or data.get("type") == "INTERRUPT_RESPONSE":
                         # Put response in queue for agent to consume
+                        print(f"Received intervention response: {data}")
                         await response_queue.put(data.get("payload", {}).get("input", ""))
             except WebSocketDisconnect:
                 print(f"WebSocket disconnected for session {session_id}")
@@ -207,4 +207,4 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 # Check if the script is run directly
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.fast_api:app", host="0.0.0.0", port=8000, reload=True)

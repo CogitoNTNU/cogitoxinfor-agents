@@ -7,7 +7,7 @@ class WebSocketService {
   connect(sessionId: string): Promise<boolean> {
     return new Promise((resolve) => {
       this.sessionId = sessionId;
-      this.socket = new WebSocket(`ws://localhost:8000/ws/${sessionId}`);
+      this.socket = new WebSocket(`ws://localhost:8000/api/ws/${sessionId}`);
       
       this.socket.onopen = () => {
         console.log('WebSocket connected');

@@ -21,11 +21,16 @@ interface ConfigModalProps {
 
 export const ConfigModal: React.FC<ConfigModalProps> = ({ open, onOpenChange }) => {
   const [config, setConfig] = useState({
-    apiUrl: 'http://localhost:8000',
+    backendHost: 'localhost',
+    backendPort: '8000',
     backendFolder: '/images',
     allowInterrupts: true,
     debugMode: false,
   });
+
+  // Derived values for apiUrl and wsUrl
+  const apiUrl = `http://${config.backendHost}:${config.backendPort}`;
+  const wsUrl = `ws://${config.backendHost}:${config.backendPort}`;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -37,7 +42,14 @@ export const ConfigModal: React.FC<ConfigModalProps> = ({ open, onOpenChange }) 
   };
 
   const handleSave = () => {
-    localStorage.setItem('agentConfig', JSON.stringify(config));
+    // Save the base configuration and derived URLs
+    const configToSave = {
+      ...config,
+      apiUrl,
+      wsUrl,
+    };
+    
+    localStorage.setItem('agentConfig', JSON.stringify(configToSave));
     toast.success("Configuration saved", {
       description: "Your settings have been updated"
     });
@@ -56,11 +68,21 @@ export const ConfigModal: React.FC<ConfigModalProps> = ({ open, onOpenChange }) 
         
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="apiUrl">API URL</Label>
+            <Label htmlFor="backendHost">Backend Host</Label>
             <Input
-              id="apiUrl"
-              name="apiUrl"
-              value={config.apiUrl}
+              id="backendHost"
+              name="backendHost"
+              value={config.backendHost}
+              onChange={handleChange}
+            />
+          </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="backendPort">Backend Port</Label>
+            <Input
+              id="backendPort"
+              name="backendPort"
+              value={config.backendPort}
               onChange={handleChange}
             />
           </div>
@@ -73,6 +95,11 @@ export const ConfigModal: React.FC<ConfigModalProps> = ({ open, onOpenChange }) 
               value={config.backendFolder}
               onChange={handleChange}
             />
+          </div>
+
+          <div className="grid gap-2 text-sm text-gray-500">
+            <p>API URL: {apiUrl}</p>
+            <p>WebSocket URL: {wsUrl}</p>
           </div>
           
           <div className="flex items-center space-x-2">
