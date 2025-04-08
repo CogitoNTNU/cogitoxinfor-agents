@@ -2,8 +2,10 @@ Press 'Ctrl'+'S' at the same time.
 Result: Seachbar appears
 Search for OIS100.
 Result: Program: OIS100 opens
-Enter Customer: 1337 ,Enter Req delivery date: [Todays date+2] (yy/mm/dd)
-Result: The fields are populated
+Enter value in Customer field: 1337
+Result: Field is populated 
+Enter Req delivery date: [Todays date+2] (yy/mm/dd)
+Result: The field is populated
 Press Enter
 Result: Alert(Confirm) appears.
 Press OK
