@@ -22,7 +22,8 @@ const eventCallbacks = isClient ? {
   [MESSAGE_TYPES.ACTION_UPDATE]: [],
   [MESSAGE_TYPES.SCREENSHOT_UPDATE]: [],
   [MESSAGE_TYPES.HUMAN_INTERVENTION_REQUEST]: [],
-  [MESSAGE_TYPES.ERROR]: []
+  [MESSAGE_TYPES.ERROR]: [],
+  'connection_error': [] // Add this to handle connection errors
 } : {};
 
 // WebSocket connection state management
@@ -31,81 +32,84 @@ let reconnectTimeout = null;
 let isConnecting = false;
 let wsUrl = null;
 
-// Connect to WebSocket server - only if on client
-export const connectWebSocket = (url) => {
-  if (!isClient) return false;
-  
-  if (isConnecting || (socket && socket.readyState === WebSocket.OPEN)) {
-    console.log(`Already connected or connecting to WebSocket at ${url}`);
-    return true;
-  }
-  
-  isConnecting = true;
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // Connect to backend port (8000) rather than frontend port
-  const wsUrl = `${protocol}//localhost:8000/ws`; 
-  
-  console.log(`Attempting to connect to WebSocket at ${url}`);
-  
+// Connect to WebSocket server
+export function connectWebSocket(url, options = {}) {
   try {
-    socket = new WebSocket(url);
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already connected, closing existing connection');
+      socket.close();
+    }
     
-    socket.onopen = () => {
-      console.log('✅ WebSocket connection established');
-      isConnecting = false;
-      
-      // Clear any reconnect timeout
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-        reconnectTimeout = null;
+    socket = new WebSocket(url);
+    wsUrl = url; // Store URL for potential reconnects
+    
+    // Set timeout for initial connection
+    const connectionTimeout = setTimeout(() => {
+      if (socket && socket.readyState !== WebSocket.OPEN) {
+        console.error('WebSocket connection timed out');
+        socket.close();
+        // Trigger connection error callbacks
+        if (eventCallbacks['connection_error']) {
+          eventCallbacks['connection_error'].forEach(handler => 
+            handler('Connection timeout - verify backend server is running')
+          );
+        }
       }
-      
-      // Notify subscribers that connection is established
-      triggerCallbacks(MESSAGE_TYPES.SESSION_UPDATE, { status: 'connected' });
+    }, 5000); // 5 second timeout
+
+    socket.onopen = () => {
+      console.log('WebSocket connection established');
+      if (options.headers) {
+        // Send headers as a message if needed
+        const authMessage = { type: 'auth', headers: options.headers };
+        socket.send(JSON.stringify(authMessage));
+      }
+      eventCallbacks[MESSAGE_TYPES.SESSION_UPDATE]?.forEach(handler => 
+        handler({ status: 'connected' })
+      );
     };
     
     socket.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('WebSocket message received:', message);
+        console.log('Received message:', message);
         
-        // Handle the received message by triggering appropriate callbacks
-        const { type, payload } = message;
-        triggerCallbacks(type, payload);
-      } catch (err) {
-        console.error('Error parsing WebSocket message:', err);
+        if (message.type && eventCallbacks[message.type]) {
+          eventCallbacks[message.type].forEach(handler => handler(message.payload || {}));
+        }
+      } catch (error) {
+        console.error('Error parsing message:', error);
       }
     };
     
     socket.onerror = (error) => {
       console.error('WebSocket error:', error);
-      isConnecting = false;
-      triggerCallbacks(MESSAGE_TYPES.ERROR, { message: 'Connection error' });
+      if (eventCallbacks['connection_error']) {
+        eventCallbacks['connection_error'].forEach(handler => handler('Connection error'));
+      }
     };
     
     socket.onclose = (event) => {
-      console.log('WebSocket disconnected', event);
-      isConnecting = false;
-      socket = null;
-      
-      // Notify subscribers that connection is closed
-      triggerCallbacks(MESSAGE_TYPES.SESSION_UPDATE, { status: 'disconnected' });
-      
-      // Attempt to reconnect after delay
-      reconnectTimeout = setTimeout(() => {
-        console.log('Attempting to reconnect WebSocket...');
-        if (wsUrl) connectWebSocket(wsUrl);
-      }, 5000);
+      console.log(`WebSocket connection closed: ${event.code} ${event.reason}`);
+      if (!event.wasClean) {
+        if (eventCallbacks['connection_error']) {
+          eventCallbacks['connection_error'].forEach(handler => 
+            handler(`Connection closed unexpectedly: ${event.code}`)
+          );
+        }
+      } else {
+        eventCallbacks[MESSAGE_TYPES.SESSION_UPDATE]?.forEach(handler => 
+          handler({ status: 'disconnected' })
+        );
+      }
     };
     
     return true;
-  } catch (err) {
-    console.error('Failed to create WebSocket connection:', err);
-    isConnecting = false;
-    triggerCallbacks(MESSAGE_TYPES.ERROR, { message: 'Failed to create connection' });
+  } catch (error) {
+    console.error('Failed to connect to WebSocket:', error);
     return false;
   }
-};
+}
 
 // Register event listeners
 export const on = (eventType, callback) => {
