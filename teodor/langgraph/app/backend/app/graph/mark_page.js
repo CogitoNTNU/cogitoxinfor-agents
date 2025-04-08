@@ -21,16 +21,32 @@ document.head.append(styleTag);
 
 let labels = [];
 
-function unmarkPage() {
-    // Unmark page logic
-    for (const label of labels) {
-        document.body.removeChild(label);
+// Make functions globally available by attaching to window object
+window.unmarkPage = function() {
+    console.log("Running unmarkPage");
+    try {
+        // Unmark page logic with safety checks
+        if (labels && Array.isArray(labels)) {
+            for (const label of labels) {
+                if (label && document.body.contains(label)) {
+                    document.body.removeChild(label);
+                }
+            }
+        }
+        labels = [];
+        return true; // Indicate success
+    } catch (e) {
+        console.error("Error in unmarkPage:", e);
+        // Try to clean up anyway
+        labels = [];
+        return false; // Indicate failure
     }
-    labels = [];
-}
+};
 
-function markPage() {
-    unmarkPage();
+window.markPage = function() {
+    try {
+        // Call unmarkPage first to clear existing labels
+        window.unmarkPage();
     
     // Function to temporarily reveal hidden elements for detection
     function temporarilyRevealHidden() {
@@ -297,55 +313,71 @@ function markPage() {
         return aLeft - bLeft;
     });
 
-    items.forEach(function (item, index) {
-        item.rects.forEach((bbox) => {
-            var adjustedLeft = bbox.left - bodyRect.left;
-            var adjustedTop = bbox.top - bodyRect.top;
-    
-            var newElement = document.createElement("div");
-            var borderColor = getRandomColor();
-            newElement.style.outline = `2px dashed ${borderColor}`;
-            newElement.style.position = "fixed";
-            newElement.style.left = adjustedLeft + "px";
-            newElement.style.top = adjustedTop + "px";
-            newElement.style.width = bbox.width + "px";
-            newElement.style.height = bbox.height + "px";
-            newElement.style.pointerEvents = "none";
-            newElement.style.boxSizing = "border-box";
-            newElement.style.zIndex = 2147483647;
-    
-            // Add floating label at the corner
-            var label = document.createElement("span");
-            label.textContent = index;
-            label.style.position = "absolute";
-            label.style.top = "-19px";
-            label.style.left = "0px";
-            label.style.background = borderColor;
-            label.style.color = "white";
-            label.style.padding = "2px 4px";
-            label.style.fontSize = "12px";
-            label.style.borderRadius = "2px";
-            newElement.appendChild(label);
+        // Sort and render items
+        items.forEach(function (item, index) {
+            item.rects.forEach((bbox) => {
+                var adjustedLeft = bbox.left - bodyRect.left;
+                var adjustedTop = bbox.top - bodyRect.top;
+        
+                var newElement = document.createElement("div");
+                var borderColor = getRandomColor();
+                newElement.style.outline = `2px dashed ${borderColor}`;
+                newElement.style.position = "fixed";
+                newElement.style.left = adjustedLeft + "px";
+                newElement.style.top = adjustedTop + "px";
+                newElement.style.width = bbox.width + "px";
+                newElement.style.height = bbox.height + "px";
+                newElement.style.pointerEvents = "none";
+                newElement.style.boxSizing = "border-box";
+                newElement.style.zIndex = 2147483647;
+        
+                // Add floating label at the corner
+                var label = document.createElement("span");
+                label.textContent = index;
+                label.style.position = "absolute";
+                label.style.top = "-19px";
+                label.style.left = "0px";
+                label.style.background = borderColor;
+                label.style.color = "white";
+                label.style.padding = "2px 4px";
+                label.style.fontSize = "12px";
+                label.style.borderRadius = "2px";
+                newElement.appendChild(label);
 
-            document.body.appendChild(newElement);
-            labels.push(newElement);
+                document.body.appendChild(newElement);
+                labels.push(newElement);
+            });
         });
-    });
 
-    // Restore hidden elements to their original state
-    restoreHiddenElements(hiddenElements);
+        // Restore hidden elements to their original state
+        restoreHiddenElements(hiddenElements);
 
-    // Ensure coordinates is always an array
-    const coordinates = items.length ? items.flatMap((item) =>
-        item.rects.map(({ left, top, width, height }) => ({
-            x: (left + left + width) / 2,
-            y: (top + top + height) / 2,
-            type: item.type,
-            text: item.text,
-            ariaLabel: item.ariaLabel,
-            id: item.id,
-        }))
-    ) : [];
-    
-    return coordinates;
+        // Return coordinates array
+        const coordinates = items.length ? items.flatMap((item) =>
+            item.rects.map(({ left, top, width, height }) => ({
+                x: (left + left + width) / 2,
+                y: (top + top + height) / 2,
+                type: item.type,
+                text: item.text,
+                ariaLabel: item.ariaLabel,
+                id: item.id,
+            }))
+        ) : [];
+        
+        return coordinates;
+        
+    } catch (e) {
+        console.error("Error in markPage:", e);
+        // Return an empty array on error
+        return [];
+    }
+};
+
+// Keep original function definitions for backwards compatibility
+function unmarkPage() {
+    return window.unmarkPage();
+}
+
+function markPage() {
+    return window.markPage();
 }
