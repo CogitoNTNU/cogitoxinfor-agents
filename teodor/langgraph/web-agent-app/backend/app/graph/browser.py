@@ -19,169 +19,182 @@ _browser_instance: Dict[str, Any] = {
 # CDP connection endpoint
 CDP_ENDPOINT = "http://localhost:9223" # Changed port to 9223
 
-async def initialize_browser(start_url: Optional[str] = None, reuse_session: bool = True):
-    """
-    Connects to an existing browser instance via CDP and returns the page and context.
-    Requires Chrome/Chromium to be launched with --remote-debugging-port=9222 (or the port specified in CDP_ENDPOINT).
+# Update BROWSER_TYPES with persistent config
+BROWSER_TYPES = {
+    "chrome": {
+        "executable_path": "/usr/bin/google-chrome",
+        "default_port": 9223,
+        "launch_args": ['--no-sandbox', '--disable-blink-features=AutomationControlled']
+    },
+    "personal_chrome": {
+        "executable_path": None,  # Will use system default
+        "default_port": 9223,
+        "launch_args": ['--no-sandbox', '--disable-blink-features=AutomationControlled'],
+        "persistent": True  # Add persistent flag
+    }
+}
 
-    Args:
-        start_url: URL to navigate to if a new page needs to be opened.
-        reuse_session: Whether to reuse an existing connection if available.
+class BrowserConfig:
+    def __init__(
+        self,
+        browser_type: str = "personal_chrome",
+        host: str = "localhost",
+        port: Optional[int] = None,
+        user_data_dir: Optional[str] = None,
+        headless: bool = False,
+        use_cdp: bool = False,
+        custom_args: Optional[list] = None,
+        persistent: bool = True
+    ):
+        self.browser_type = browser_type.lower()
+        self.host = host
+        self.browser_config = BROWSER_TYPES.get(self.browser_type, BROWSER_TYPES["chrome"])
+        self.port = port or self.browser_config["default_port"]
+        self.user_data_dir = user_data_dir
+        self.headless = headless
+        self.use_cdp = use_cdp
+        self.custom_args = custom_args or []
+        self.persistent = persistent
+        
+    @property
+    def launch_args(self) -> list:
+        """Get the combined launch arguments for the browser."""
+        args = self.browser_config["launch_args"].copy()
+        if self.port:
+            args.append(f'--remote-debugging-port={self.port}')
+        args.extend(self.custom_args)
+        return args
 
-    Returns:
-        Tuple of (playwright, context, page)
-    """
+
+async def initialize_browser(
+    start_url: Optional[str] = None,
+    reuse_session: bool = True,
+    config: Optional[BrowserConfig] = None
+) -> Tuple[Any, Any, Any]:
     global _browser_instance
     
-    # Check if we have an active browser session and should reuse it
+    if config is None:
+        config = BrowserConfig()
+    
     if reuse_session and _browser_instance["is_active"]:
-        print("Reusing existing browser session")
-        # Ensure all components are valid before returning reuse
-        if (_browser_instance["playwright"] and
-            _browser_instance["context"] and
-            _browser_instance["page"]):
-             return (_browser_instance["playwright"],
-                     _browser_instance["context"],
-                     _browser_instance["page"])
-        else:
-             # If components are missing, mark as inactive and proceed to connect
-             _browser_instance["is_active"] = False
-             print("Warning: Reused session components missing, establishing new connection.")
-
-
-    # Otherwise, establish a new connection
+        if all(_browser_instance.values()):
+            return (_browser_instance["playwright"],
+                    _browser_instance["context"],
+                    _browser_instance["page"])
+    
     playwright = await async_playwright().start()
     try:
-        print("Waiting 2 seconds before attempting connection...")
-        await asyncio.sleep(2) # Added delay
-        print(f"Attempting to connect to browser at {CDP_ENDPOINT}...")
-        browser = await playwright.chromium.connect_over_cdp(CDP_ENDPOINT)
-        print("Successfully connected to browser.")
-
-        # Assume the first context is the default one the user is interacting with
-        if not browser.contexts:
-             raise RuntimeError("No browser contexts found. Is the browser running with the correct profile?")
-        context = browser.contexts[0]
-
-        # Get the first available page (tab) or create a new one
-        if context.pages:
-            page = context.pages[0]
-            print(f"Using existing page: {page.url}")
-        else:
-            print("No open pages found, creating a new one.")
-            page = await context.new_page()
-            if start_url:
-                print(f"Navigating new page to: {start_url}")
-                await page.goto(start_url)
+        if config.persistent:
+            # Launch persistent context
+            context = await playwright.chromium.launch_persistent_context(
+                user_data_dir=config.user_data_dir,
+                headless=config.headless,
+                args=config.launch_args
+            )
+            # Get first page or create new one
+            if context.pages:
+                page = context.pages[0]
             else:
-                 # Maybe navigate to about:blank or a default page?
-                 await page.goto("about:blank")
-
-
-        # Store the connection details
-        _browser_instance["playwright"] = playwright
-        _browser_instance["browser"] = browser # Store browser
-        _browser_instance["context"] = context
-        _browser_instance["page"] = page
-        _browser_instance["is_active"] = True
-
-        # Handle disconnection
-        browser.on("disconnected", lambda: handle_disconnect(playwright))
-
+                page = await context.new_page()
+        else:
+            # Regular browser launch
+            browser = await playwright.chromium.launch(
+                headless=config.headless,
+                args=config.launch_args
+            )
+            context = await browser.new_context(
+                user_data_dir=config.user_data_dir
+            )
+            page = await context.new_page()
+        
+        if start_url:
+            await page.goto(start_url)
+            
+        _browser_instance.update({
+            "playwright": playwright,
+            "browser": None if config.persistent else browser,
+            "context": context,
+            "page": page,
+            "is_active": True
+        })
+        
         return playwright, context, page
-
-    except PlaywrightError as e:
-        await playwright.stop()
-        if "ECONNREFUSED" in str(e):
-             # Updated error message to reflect the new default port
-             raise RuntimeError(f"Connection refused at {CDP_ENDPOINT}. Is Chrome running with --remote-debugging-port=9223 (or the correct port)? Ensure ALL other Chrome instances are closed first.") from e
-        raise RuntimeError(f"Failed to connect to browser via CDP: {str(e)}") from e
+        
     except Exception as e:
-        # Ensure playwright is stopped in case of other errors during setup
-        if playwright and playwright.is_connected:
-             await playwright.stop()
-        raise RuntimeError(f"An unexpected error occurred during browser initialization: {str(e)}") from e
-
-def handle_disconnect(playwright_instance):
-    """Callback function for browser disconnection."""
-    global _browser_instance
-    print("Browser disconnected.")
-    _browser_instance = {
-        "playwright": None,
-        "browser": None,
-        "context": None,
-        "page": None,
-        "is_active": False
-    }
-    # We might not want to stop playwright here if other parts of the app use it
-    # Consider if playwright.stop() is needed or if it should be handled elsewhere
-    # asyncio.create_task(playwright_instance.stop()) # Example if stopping is desired
+        await playwright.stop()
+        raise RuntimeError(f"Failed to initialize browser: {str(e)}") from e
 
 
-async def close_browser(force=False):
+async def close_browser(force: bool = False):
     """
     Close the browser and clean up resources.
     
     Args:
-        force: If True, mark the session as inactive. If False, do nothing.
-               Note: This function no longer actually closes the user's browser.
+        force: If True, clean up all resources. If False, only clean up non-persistent sessions.
     """
     global _browser_instance
 
-    if force:
-        # We don't close the context or stop playwright when connected via CDP,
-        # as that would affect the user's main browser instance.
-        # We just mark our tracked session as inactive.
-        if _browser_instance["is_active"]:
-             _browser_instance["is_active"] = False
-             # Optionally detach? browser.disconnect() - maybe too aggressive.
-             # Resetting the state seems sufficient.
-             _browser_instance = {
-                 "playwright": _browser_instance["playwright"], # Keep playwright instance?
-                 "browser": None,
-                 "context": None,
-                 "page": None,
-                 "is_active": False
-             }
-             print("Browser session marked as inactive (CDP connection). Browser remains open.")
+    try:
+        if not _browser_instance["is_active"]:
+            print("No active browser session to close.")
+            return
+
+        # Get the current context and playwright instance
+        context = _browser_instance["context"]
+        playwright = _browser_instance["playwright"]
+        browser = _browser_instance["browser"]
+
+        if force:
+            # Close everything regardless of persistence
+            if context:
+                await context.close()
+            if browser:
+                await browser.close()
+            if playwright:
+                await playwright.stop()
+                
+            _browser_instance.update({
+                "playwright": None,
+                "browser": None,
+                "context": None,
+                "page": None,
+                "is_active": False
+            })
+            print("Browser session forcefully closed and all resources cleaned up.")
         else:
-             print("No active browser session to mark as inactive.")
+            # Only close non-persistent sessions
+            if browser:  # Non-persistent session
+                await context.close()
+                await browser.close()
+                await playwright.stop()
+                
+                _browser_instance.update({
+                    "playwright": None,
+                    "browser": None,
+                    "context": None,
+                    "page": None,
+                    "is_active": False
+                })
+                print("Non-persistent browser session closed.")
+            else:  # Persistent session
+                # Just mark as inactive but keep the session
+                _browser_instance.update({
+                    "playwright": playwright,
+                    "browser": None,
+                    "context": context,
+                    "page": None,
+                    "is_active": False
+                })
+                print("Persistent browser session marked as inactive. Browser remains open.")
 
-    else:
-        # If not forcing, we definitely don't do anything.
-        print("Browser session kept active (CDP connection).")
-
-
-async def get_current_browser_session() -> Optional[Tuple]:
-    """
-    Get the current browser connection details if active.
-
-    Returns:
-        Tuple of (playwright, context, page) if active, None otherwise.
-    """
-    if _browser_instance["is_active"]:
-        # Ensure all components are still valid before returning
-        if (_browser_instance["playwright"] and
-            _browser_instance["context"] and
-            _browser_instance["page"]):
-             # Check if page is still connected/valid? page.is_closed() might be useful
-             # if not _browser_instance["page"].is_closed(): # Requires async check
-             return (_browser_instance["playwright"],
-                     _browser_instance["context"],
-                     _browser_instance["page"])
-        else:
-             # If components are missing, mark as inactive
-             _browser_instance["is_active"] = False
-             print("Warning: Active session components missing, marking as inactive.")
-             return None
-    return None
-
-
-def is_browser_active() -> bool:
-    """
-    Check if the browser is active.
-    
-    Returns:
-        True if active, False otherwise
-    """
-    return _browser_instance["is_active"]
+    except Exception as e:
+        print(f"Error while closing browser: {str(e)}")
+        # Ensure we reset the state even if there's an error
+        _browser_instance.update({
+            "playwright": None,
+            "browser": None,
+            "context": None,
+            "page": None,
+            "is_active": False
+        })
+        raise

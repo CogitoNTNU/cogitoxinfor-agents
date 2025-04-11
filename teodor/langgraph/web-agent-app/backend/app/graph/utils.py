@@ -199,6 +199,7 @@ async def update_scratchpad(state: AgentState, config) -> AgentState:
 import os
 import base64
 import uuid
+from ..config import HISTORY_DIR
 
 def get_history_dir(thread_id=None):
     """
@@ -211,13 +212,13 @@ def get_history_dir(thread_id=None):
         Path to the history directory
     """
     if thread_id is None:
-        print("No thread_id provided, using default")
+        return HISTORY_DIR
+        
+    # Create thread-specific directory
+    thread_dir = os.path.join(HISTORY_DIR, thread_id)
+    os.makedirs(thread_dir, exist_ok=True)
     
-    # Create the history directory if it doesn't exist
-    history_dir = os.path.join("history", thread_id)
-    os.makedirs(history_dir, exist_ok=True)
-    
-    return history_dir
+    return thread_dir
 
 def setup_history_folder(thread_id=None):
     """

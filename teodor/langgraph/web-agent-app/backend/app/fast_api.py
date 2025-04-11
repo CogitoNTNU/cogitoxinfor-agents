@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 # No need for sys.path.append since the graph is now local
 # Import from the local graph implementation
-from .graph.browser import initialize_browser, close_browser
+from .graph.browser import initialize_browser, close_browser, BrowserConfig
 from .graph.main import run_agent as langgraph_run_agent
 from .capture_dom import capture_dom
 
@@ -46,16 +46,18 @@ class AgentRequest(BaseModel):
 async def health_check():
     return {"status": "healthy"}
 
+from .config import HISTORY_DIR
+
 @app.get("/api/history/{session_id}/{step}")
 async def get_screenshot(session_id: str, step: int):
     """Retrieve a screenshot from the history folder"""
-    history_dir = os.path.join(os.path.expanduser("~"), "langgraph_history", session_id)
+    history_dir = os.path.join(HISTORY_DIR, session_id)
     filename = f"{session_id}_{step}.png"
     file_path = os.path.join(history_dir, filename)
     
     if os.path.exists(file_path):
         return FileResponse(file_path)
-    raise HTTPException(status_code=404, detail="Screenshot not found")
+    raise HTTPException(status_code=404, detail=f"Screenshot not found at {file_path}")
 
 @app.post("/api/agent/run")
 async def run_web_agent(request: AgentRequest):
@@ -94,61 +96,57 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     response_queues[session_id] = response_queue
     
     try:
-        # Get session parameters
         session = active_sessions[session_id]
         
-        # # Send initial message
-        # await websocket.send_json({
-        #     "type": "STATUS_UPDATE", 
-        #     "payload": {"status": "starting", "message": "Initializing browser..."}
-        # })
-        
-        # Define callback for sending events
         async def event_callback(event_data):
             print(f"Event callback triggered with data: {event_data}")
             await websocket.send_json(event_data)
-            # After certain events, send a DOM update
-            # if event_data.get("type") in ["ACTION_UPDATE", "SCREENSHOT_UPDATE"]:
-            #     if page:
-            #         dom_data = await capture_dom(page)
-            #         await websocket.send_json({
-            #             "type": "DOM_UPDATE", 
-            #             "payload": dom_data
-            #         })
         
-        # Background task to handle WebSocket messages from client
+        # Background task to handle WebSocket messages
         async def handle_client_messages():
             try:
                 while True:
                     data = await websocket.receive_json()
-                    if data.get("type") == "INTERVENTION_RESPONSE" or data.get("type") == "INTERRUPT_RESPONSE":
-                        # Put response in queue for agent to consume
-                        print(f"Received intervention response: {data}")
-                        await response_queue.put(data.get("payload", {}).get("input", ""))
+                    print(f"Received WebSocket message: {data}")
+                    if data.get("type") == "INTERVENTION_RESPONSE":
+                        user_input = data.get("payload", {}).get("input", "")
+                        print(f"Putting response in queue: {user_input}")
+                        await response_queue.put(user_input)
             except WebSocketDisconnect:
                 print(f"WebSocket disconnected for session {session_id}")
             except Exception as e:
                 print(f"Error in client message handler: {str(e)}")
-        
-        # Start message handler in background
+
+        # Start message handler
         client_handler = asyncio.create_task(handle_client_messages())
+
+        playwright = None
+        context = None
+        page = None
+        
+        import os
+        from pathlib import Path
+
+        # Define default user data directory
+        DEFAULT_USER_DATA_DIR = os.path.join(os.path.expanduser("~"), "playwright_user_data")
+
+        # Create browser configuration
+        browser_config = BrowserConfig(
+            browser_type="personal_chrome",
+            persistent=True,
+            user_data_dir=DEFAULT_USER_DATA_DIR
+        )
             
-        # Execute agent
+        # Initialize browser with persistent context
+        playwright, context, page = await initialize_browser(
+            start_url="https://www.google.com",
+            reuse_session=True,
+            config=browser_config
+        )
+    
+
         try:
-            playwright = None
-            context = None
-            page = None
-            
-            # Initialize browser
-            playwright, context, page = await initialize_browser()
-            
-            # Update status
-            await websocket.send_json({
-                "type": "STATUS_UPDATE", 
-                "payload": {"status": "running", "message": "Browser initialized, running agent..."}
-            })
-            
-            # Run the agent
+            # Run the agent with UI mode enabled
             final_answer = await langgraph_run_agent(
                 page=page,
                 query=session["query"],
@@ -164,7 +162,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 human_intervention=session["human_intervention"],
                 event_callback=event_callback,
                 ui_mode=True,  # Enable UI mode
-                response_queue=response_queue  # Pass response queue for user input
+                response_queue=response_queue  # Pass response queue
             )
             
             # Send completion message
@@ -182,8 +180,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             raise
         finally:
             # Clean up browser resources
-            if page:
-                await close_browser(playwright, context)
+            try:
+                await close_browser(force=False)
+                print("Browser session closed.")
+            except Exception as e:
+                print(f"Error closing browser: {str(e)}")
             # Cancel background task
             client_handler.cancel()
             

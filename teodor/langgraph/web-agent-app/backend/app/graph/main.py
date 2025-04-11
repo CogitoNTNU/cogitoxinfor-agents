@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from langgraph.types import Command
 from .tools import CLICK, TYPE, SCROLL, WAIT, NAVIGATE
 from .models import InputState, Prediction
-from .browser import initialize_browser, close_browser
+from .browser import initialize_browser, close_browser, BrowserConfig
 
 # Load environment variables
 load_dotenv()
@@ -64,9 +64,11 @@ async def run_agent(
     
     thread_id = config["configurable"]["thread_id"]
     # Add UI mode and response queue to config
-    config["configurable"]["ui_mode"] = ui_mode
-    config["configurable"]["response_queue"] = response_queue
-    
+    thread_config = {
+        **config["configurable"],
+        "ui_mode": ui_mode,
+        "response_queue": response_queue
+    }
     print(f"Thread ID: {thread_id}")
     history_dir = setup_history_folder(thread_id)
     
@@ -108,68 +110,42 @@ async def run_agent(
             answer_found = False
             try:
                 async for event in event_stream:
-                    # Only clear output when it's NOT an interrupt event
-                    if "__interrupt__" not in event:
-                        display.clear_output(wait=True)            
-                    
-                    # Check if there's an interrupt in the event
                     if "__interrupt__" in event:
                         interrupt_info = event["__interrupt__"][0]
                         message = interrupt_info.value
-                        
-                        print("\n" + "=" * 50)
-                        print(f"🔔 HUMAN INPUT REQUIRED:")
-                        print(f"Agent is requesting approval: {message}")
-                        print("=" * 50 + "\n")
-                        
-                        # Notify about interrupt via callback if provided
-                        if event_callback:
-                            interrupt_message = {
+                        step_number = len(steps)
+
+                        if ui_mode and event_callback:
+                            # Send interrupt to frontend
+                            await event_callback({
                                 "type": "INTERRUPT",
                                 "payload": {
                                     "session_id": thread_id,
                                     "message": message,
                                     "step": step_number
                                 }
-                            }
-                            await event_callback(interrupt_message)
+                            })
                             
-                            # If we're in UI mode, wait for input from the callback
-                            # Otherwise fall back to console input
-                            if config.get("ui_mode", False):
-                                # Here we need to pause and wait for a response
-                                # This would require a mechanism to wait for the UI's response
-                                response_queue = config.get("response_queue")
-                                if response_queue:
-                                    # Wait for UI to provide input
-                                    user_input = await response_queue.get()
-                                else:
-                                    # Fallback if no queue is provided
-                                    user_input = ""
+                            # Wait for response from frontend
+                            if response_queue:
+                                print("Waiting for UI response...")
+                                user_input = await response_queue.get()
+                                print(f"Received UI response: {user_input}")
+                                
+                                # Create command to resume execution
+                                current_input = Command(resume=user_input)
+                                break  # Exit event loop to process command
                             else:
-                                # Small delay to ensure message is visible before the input prompt appears
-                                await asyncio.sleep(0.2)
-                                user_input = input(
-                                    f"""
+                                raise Exception("Response queue not available")
+                        else:
+                            # Console mode fallback
+                            user_input = input(                                    f"""
                                     Agent is requesting approval: {message}
                                     \nClick 'ENTER' to approve or provide alternative instructions, pass the element id you want to invoke: 
                                     \nInput 'exit' to stop the agent.
-                                    """
-                                    )
-                        else:
-                            # Fallback to console input if no callback
-                            await asyncio.sleep(0.2)
-                            user_input = input(
-                                f"""
-                                Agent is requesting approval: {message}
-                                \nClick 'ENTER' to approve or provide alternative instructions, pass the element id you want to invoke: 
-                                \nInput 'exit' to stop the agent.
-                                """
-                                )
-                                     
-                        # Create a Command to resume execution
-                        current_input = Command(resume=user_input)
-                        break  # Exit the event loop to process the command
+                                    """)
+                            current_input = Command(resume=user_input)
+                            break
                     
                     # Process normal event updates
                     step_number = len(steps)
@@ -280,7 +256,7 @@ async def run_agent(
     return final_answer
 
 
-
+# Update the test_agent function
 async def test_agent(
         config=None, 
         state=None, 
@@ -288,7 +264,8 @@ async def test_agent(
         testing=False, 
         test_actions=None,
         human_intervention=None,
-        start_url=None
+        start_url=None,
+        user_data_dir=None
         ) -> str:
     """
     Run the web agent with the specified configuration.
@@ -299,25 +276,32 @@ async def test_agent(
         query: The user query to process
         testing: Whether to run in testing mode with predefined actions
         test_actions: List of (action, args) tuples to test
+        browser_type: Type of browser to use ("chrome" or "chromium")
+        user_data_dir: Path to user data directory
         
     Returns:
         The final answer from the agent
     """
-  # Debug input parameters
-    print(f"DEBUG test_agent inputs:")
-    print(f"  - query: {query}")
-    print(f"  - config: {config}")
-    print(f"  - state: {state}")
-    print(f"  - testing: {testing}")
-    print(f"  - test_actions: {test_actions}")
-    print(f"  - human_intervention: {human_intervention}")
-    
     playwright = None
     context = None
     
     try:
-        # Initialize browser with state restoration
-        playwright, context, page = await initialize_browser(reuse_session=True)
+        # Ensure user data directory exists
+        os.makedirs(user_data_dir, exist_ok=True)
+
+        # Create browser configuration
+        browser_config = BrowserConfig(
+            browser_type="personal_chrome",
+            persistent=True,
+            user_data_dir="~/playwright_user_data"
+        )
+            
+        # Initialize browser with persistent context
+        playwright, context, page = await initialize_browser(
+            start_url="https://www.google.com",
+            reuse_session=True,
+            config=browser_config
+        )
         
         # Run the agent with the initialized page
         return await run_agent(
@@ -329,9 +313,8 @@ async def test_agent(
             test_actions=test_actions,
         )
     finally:
-        # Save state when closing browser
-        #await close_browser(playwright, context)
         print("Finished.")
+        await close_browser(force=False)
 
         
 # In the __main__ section, fix the asyncio.run syntax
@@ -346,7 +329,13 @@ if __name__ == "__main__":
     6. Find the car's specifications.
     7. Give me a summary of the car's specifications and features.
     """
-    
+    import os
+    from pathlib import Path
+
+    # Define default user data directory
+    DEFAULT_USER_DATA_DIR = os.path.join(os.path.expanduser("~"), "playwright_user_data")
+
+        
     # Define the sequence of actions to test
     test_actions = [
         (NAVIGATE, ['https://www.google.com']),
@@ -367,6 +356,7 @@ if __name__ == "__main__":
         testing=True,
         test_actions=test_actions,
         human_intervention=True,
+        user_data_dir=DEFAULT_USER_DATA_DIR,  # Use default user data directory
         #start_url="https://www.google.com",
         config={
             "recursion_limit": 150,
