@@ -26,7 +26,7 @@ BROWSER_TYPES = {
         "default_port": 9223,
         "launch_args": ['--no-sandbox', '--disable-blink-features=AutomationControlled']
     },
-    "personal_chrome": {
+    "playwright_chrome": {
         "executable_path": None,  # Will use system default
         "default_port": 9223,
         "launch_args": ['--no-sandbox', '--disable-blink-features=AutomationControlled'],
@@ -37,7 +37,7 @@ BROWSER_TYPES = {
 class BrowserConfig:
     def __init__(
         self,
-        browser_type: str = "personal_chrome",
+        browser_type: str = "playwright_chrome",
         host: str = "localhost",
         port: Optional[int] = None,
         user_data_dir: Optional[str] = None,
@@ -65,19 +65,22 @@ class BrowserConfig:
         args.extend(self.custom_args)
         return args
 
+_last_url = None
 
 async def initialize_browser(
     start_url: Optional[str] = None,
     reuse_session: bool = True,
     config: Optional[BrowserConfig] = None
 ) -> Tuple[Any, Any, Any]:
-    global _browser_instance
+    global _browser_instance, _last_url
     
     if config is None:
         config = BrowserConfig()
     
     if reuse_session and _browser_instance["is_active"]:
-        if all(_browser_instance.values()):
+        if all(v is not None for v in [_browser_instance["playwright"], 
+                                     _browser_instance["context"], 
+                                     _browser_instance["page"]]):
             return (_browser_instance["playwright"],
                     _browser_instance["context"],
                     _browser_instance["page"])
@@ -85,34 +88,35 @@ async def initialize_browser(
     playwright = await async_playwright().start()
     try:
         if config.persistent:
-            # Launch persistent context
             context = await playwright.chromium.launch_persistent_context(
                 user_data_dir=config.user_data_dir,
                 headless=config.headless,
                 args=config.launch_args
             )
-            # Get first page or create new one
-            if context.pages:
-                page = context.pages[0]
-            else:
-                page = await context.new_page()
+            browser = None  # No browser object in persistent mode
         else:
-            # Regular browser launch
+            # Launch regular browser for non-persistent context
             browser = await playwright.chromium.launch(
                 headless=config.headless,
                 args=config.launch_args
             )
-            context = await browser.new_context(
-                user_data_dir=config.user_data_dir
-            )
+            context = await browser.new_context()
+            
+        # Get first page or create new one
+        if context.pages:
+            page = context.pages[0]
+        else:
             page = await context.new_page()
         
-        if start_url:
+        # Navigate to last URL if available, otherwise use start_url
+        if _last_url and not start_url:
+            await page.goto(_last_url)
+        elif start_url:
             await page.goto(start_url)
-            
+        
         _browser_instance.update({
             "playwright": playwright,
-            "browser": None if config.persistent else browser,
+            "browser": browser,  # Will be None for persistent context
             "context": context,
             "page": page,
             "is_active": True
@@ -128,24 +132,28 @@ async def initialize_browser(
 async def close_browser(force: bool = False):
     """
     Close the browser and clean up resources.
-    
-    Args:
-        force: If True, clean up all resources. If False, only clean up non-persistent sessions.
     """
-    global _browser_instance
+    global _browser_instance, _last_url
 
     try:
         if not _browser_instance["is_active"]:
             print("No active browser session to close.")
             return
 
-        # Get the current context and playwright instance
         context = _browser_instance["context"]
         playwright = _browser_instance["playwright"]
         browser = _browser_instance["browser"]
+        page = _browser_instance["page"]
+
+        # Store current URL before closing
+        if page:
+            try:
+                _last_url = page.url
+                print(f"Stored last URL: {_last_url}")
+            except Exception as e:
+                print(f"Failed to store last URL: {str(e)}")
 
         if force:
-            # Close everything regardless of persistence
             if context:
                 await context.close()
             if browser:
@@ -162,7 +170,6 @@ async def close_browser(force: bool = False):
             })
             print("Browser session forcefully closed and all resources cleaned up.")
         else:
-            # Only close non-persistent sessions
             if browser:  # Non-persistent session
                 await context.close()
                 await browser.close()
@@ -177,7 +184,10 @@ async def close_browser(force: bool = False):
                 })
                 print("Non-persistent browser session closed.")
             else:  # Persistent session
-                # Just mark as inactive but keep the session
+                if page:
+                    # Only close the page, keep the context
+                    await page.close()
+                
                 _browser_instance.update({
                     "playwright": playwright,
                     "browser": None,
@@ -185,11 +195,10 @@ async def close_browser(force: bool = False):
                     "page": None,
                     "is_active": False
                 })
-                print("Persistent browser session marked as inactive. Browser remains open.")
+                print("Persistent browser session marked as inactive. Context preserved.")
 
     except Exception as e:
         print(f"Error while closing browser: {str(e)}")
-        # Ensure we reset the state even if there's an error
         _browser_instance.update({
             "playwright": None,
             "browser": None,

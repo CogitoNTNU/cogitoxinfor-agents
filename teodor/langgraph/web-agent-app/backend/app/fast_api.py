@@ -52,7 +52,7 @@ from .config import HISTORY_DIR
 async def get_screenshot(session_id: str, step: int):
     """Retrieve a screenshot from the history folder"""
     history_dir = os.path.join(HISTORY_DIR, session_id)
-    filename = f"{session_id}_{step}.png"
+    filename = f"{step}.png"
     file_path = os.path.join(history_dir, filename)
     
     if os.path.exists(file_path):
@@ -123,16 +123,13 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         playwright = None
         context = None
         page = None
-        
-        import os
-        from pathlib import Path
 
         # Define default user data directory
         DEFAULT_USER_DATA_DIR = os.path.join(os.path.expanduser("~"), "playwright_user_data")
 
         # Create browser configuration
         browser_config = BrowserConfig(
-            browser_type="personal_chrome",
+            browser_type="playwright_chrome",
             persistent=True,
             user_data_dir=DEFAULT_USER_DATA_DIR
         )

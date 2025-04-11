@@ -256,15 +256,14 @@ def save_image_to_history(image_base64, step_number=None, thread_id=None):
             print("No step_number provided, using default")
             return None
         
-        filename = f"{thread_id}_{step_number}.png"
+        filename = f"{step_number}.png"
     
         # Get history directory
         history_dir = get_history_dir(thread_id)
         
         # Save the image with the generated filename
         image_path = os.path.join(history_dir, filename)
-        print(f"Saving screenshot to: {image_path}")
-        
+
         # Use sync file operations with immediate flush to disk
         with open(image_path, "wb") as f:
             f.write(base64.b64decode(image_base64))

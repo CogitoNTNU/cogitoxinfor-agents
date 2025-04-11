@@ -76,17 +76,20 @@ export default function WebAgent() {
   const handleWebSocketMessage = (data) => {
     console.log('Received WebSocket message:', data);
     
-      switch(data.type) {
-        case 'SCREENSHOT_UPDATE':
-          const { step, screenshot } = data.payload;
-          // Convert the screenshot to a data URL if it's base64
-          const imageData = screenshot ? `data:image/png;base64,${screenshot}` : null;
-          setSteps(prev => [...prev, {
-            step,
-            image: imageData,
-            type: 'screenshot'
-          }]);
-          break;
+    switch(data.type) {
+      case 'SCREENSHOT_UPDATE':
+        const { 
+          step, 
+          image_url 
+        } = data.payload;
+        
+        setSteps(prev => [...prev, {
+          step,
+          // Prepend API_BASE_URL to the image_url
+          image: `${API_BASE_URL}${image_url}`,
+          type: 'screenshot'
+        }]);
+        break;
   
         case 'ACTION_UPDATE':
           const { action, args } = data.payload;
@@ -231,10 +234,11 @@ export default function WebAgent() {
                       onError={(e) => {
                         console.error('Image failed to load:', {
                           step: step.step,
-                          error: e
+                          url: step.image,
+                          sessionId: sessionId
                         });
                         e.target.onerror = null;
-                        e.target.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+                        e.target.src = '/placeholder-image.png';  // Use a local placeholder
                       }}
                       sx={{
                         maxWidth: '100%',

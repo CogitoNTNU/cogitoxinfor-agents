@@ -161,7 +161,7 @@ async def run_agent(
                         # Use the callback to send notification if provided
                         if event_callback:
                             # Create image URL - ensure consistent thread_id
-                            image_url = f"/api/history/{thread_id}/{thread_id}_{step_number}.png"
+                            image_url = f"/api/history/{thread_id}/{step_number}"
                             print(f"Sending image URL to frontend: {image_url}")
                             
                             # Create a message for the frontend
