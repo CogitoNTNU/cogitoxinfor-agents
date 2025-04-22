@@ -172,10 +172,10 @@ export default function WebAgent() {
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
           {/* Left: controls and progress */}
-          <Box sx={{ width: '40%' }}>
+          <Box sx={{ width: '60%' }}>
             <AgentController onStart={handleStartAgent} onStop={handleStopAgent} isRunning={connected} />
             {steps.some(s => s.type !== 'screenshot') && (
-              <Paper sx={{ p: 2, mt: 2 }}>
+              <Paper sx={{ p: 1, mt: 2 }}>
                 <Typography variant="h6" gutterBottom>
                   Session Progress
                 </Typography>
