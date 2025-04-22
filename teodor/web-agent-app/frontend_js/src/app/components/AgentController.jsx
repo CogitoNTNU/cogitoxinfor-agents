@@ -28,9 +28,10 @@ const TOOL_CONFIGURATIONS = {
     args: 1,
     validator: (args) => {
       const url = args[0];
+      const isValid = typeof url === 'string' && url.trim().length > 0;
       return {
-        isValid: url && typeof url === 'string',
-        error: 'URL must be a non-empty string'
+        isValid,
+        error: isValid ? '' : 'URL must be a non-empty string'
       };
     },
     placeholder: 'Enter URL (e.g., https://www.google.com)'
@@ -171,19 +172,28 @@ const AgentController = ({ onStart, onStop, isRunning }) => {
   };
 
   const handleStart = () => {
-    // Validate all actions before starting
-    const hasErrors = testActions.some((action, index) => {
-      const validation = validateAction(action.action, action.args);
-      return !validation.isValid;
-    });
+    // Prevent starting in Test Mode if no actions are defined
+    if (activeTab === 1 && testActions.length === 0) {
+      return;
+    }
+
+    const hasErrors = activeTab === 1
+      ? testActions.length === 0 || testActions.some((action, index) => {
+          const validation = validateAction(action.action, action.args);
+          return !validation.isValid;
+        })
+      : false;
 
     if (hasErrors) {
       return; // Don't start if there are validation errors
     }
 
     const formattedActions = testActions.map(action => {
-      const args = parseArguments(action.args, action.action);
-      return [action.action, args];
+      const args = parseArguments(action.args, action.action) || [];
+      return {
+        action: action.action,
+        args
+      };
     });
 
     const payload = {
@@ -341,8 +351,11 @@ const AgentController = ({ onStart, onStop, isRunning }) => {
           startIcon={isRunning ? <StopIcon /> : <PlayArrowIcon />}
           onClick={isRunning ? onStop : handleStart}
           disabled={
-            (activeTab === 0 && !query.trim()) || 
-            (activeTab === 1 && (testActions.length === 0 || Object.keys(errors).length > 0))
+            (activeTab === 0 && !query.trim()) ||
+            (activeTab === 1 && (
+              testActions.length === 0 ||
+              Object.values(errors).some(errorMsg => errorMsg.length > 0)
+            ))
           }
         >
           {isRunning ? "Stop Agent" : "Start Agent"}

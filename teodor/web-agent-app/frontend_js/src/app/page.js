@@ -1,23 +1,24 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { 
-  Container, 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
-  Card,
-  CardContent,
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import {
+  CssBaseline,
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Paper,
   Switch,
   FormControlLabel,
   List,
-  ListItem,
-  ListItemText,
-  Paper,
-  Divider
+  ListItem
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import IconButton from '@mui/material/IconButton';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
 import AgentController from './components/AgentController';
 import { API_BASE_URL, WS_BASE_URL, endpoints } from './services/api';
 
@@ -33,301 +34,234 @@ const ScrollableList = styled(List)({
 });
 
 export default function WebAgent() {
-  const [mode, setMode] = useState('agent'); // 'agent' or 'test'
-  const [query, setQuery] = useState('');
-  const [humanIntervention, setHumanIntervention] = useState(false);
+  // Theme mode state
+  const [themeMode, setThemeMode] = useState('light');
+  const theme = useMemo(
+    () => createTheme({ palette: { mode: themeMode } }),
+    [themeMode]
+  );
+
+  // Agent session state
   const [sessionId, setSessionId] = useState(null);
   const [steps, setSteps] = useState([]);
   const [connected, setConnected] = useState(false);
   const [userResponse, setUserResponse] = useState('');
   const wsRef = useRef(null);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
-  
-  
-  const connectWebSocket = (sid) => {
-    console.log('Connecting WebSocket with session ID:', sid);
+  const [screenshotIndex, setScreenshotIndex] = useState(0);
+
+  // WebSocket connection
+  const connectWebSocket = sid => {
     const ws = new WebSocket(`${WS_BASE_URL}${endpoints.websocket(sid)}`);
-    
-    ws.onopen = () => {
-      console.log('WebSocket Connected');
-      setConnected(true);
-    };
-  
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    ws.onopen = () => setConnected(true);
+    ws.onerror = () => {
       setConnected(false);
       setIsWaitingForResponse(false);
     };
-  
     ws.onclose = () => {
-      console.log('WebSocket Disconnected');
       setConnected(false);
       setIsWaitingForResponse(false);
     };
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      handleWebSocketMessage(data);
-    };
-
+    ws.onmessage = e => handleWebSocketMessage(JSON.parse(e.data));
     wsRef.current = ws;
   };
 
-  const handleWebSocketMessage = (data) => {
-    console.log('Received WebSocket message:', data);
-    
-    switch(data.type) {
+  const handleWebSocketMessage = data => {
+    switch (data.type) {
       case 'SCREENSHOT_UPDATE':
-        const { 
-          step, 
-          image_url 
-        } = data.payload;
-        
-        setSteps(prev => [...prev, {
-          step,
-          // Prepend API_BASE_URL to the image_url
-          image: `${API_BASE_URL}${image_url}`,
-          type: 'screenshot'
-        }]);
-        break;
-  
-        case 'ACTION_UPDATE':
-          const { action, args } = data.payload;
-          setSteps(prev => [...prev, {
+        setSteps(prev => [
+          ...prev,
+          {
             step: data.payload.step,
-            action,
-            args,
-            type: 'action'
-          }]);
-          break;
-
-        case 'INTERRUPT':
-          console.log('Received interrupt request:', data.payload);
-          setIsWaitingForResponse(true);
-          setSteps(prev => [...prev, {
+            image: `${API_BASE_URL}${data.payload.image_url}`,
+            type: 'screenshot'
+          }
+        ]);
+        break;
+      case 'ACTION_UPDATE':
+        setSteps(prev => [
+          ...prev,
+          { step: data.payload.step, action: data.payload.action, args: data.payload.args, type: 'action' }
+        ]);
+        break;
+      case 'INTERRUPT':
+        setIsWaitingForResponse(true);
+        setSteps(prev => [
+          ...prev,
+          {
             step: data.payload.step,
             message: data.payload.message,
             type: 'interrupt',
             needsResponse: true
-          }]);
-          break;
-
+          }
+        ]);
+        break;
       case 'FINAL_ANSWER':
-        setSteps(prev => [...prev, {
-          step: data.payload.step,
-          answer: data.payload.answer,
-          type: 'answer'
-        }]);
+        setSteps(prev => [
+          ...prev,
+          { step: data.payload.step, answer: data.payload.answer, type: 'answer' }
+        ]);
         break;
     }
   };
 
-  const handleStartAgent = async (payload) => {
+  const handleStartAgent = async payload => {
     try {
-      // Transform payload to match backend expectations
       const apiPayload = {
         query: payload.testing ? "" : payload.query,
         testing: payload.testing,
         human_intervention: payload.human_intervention,
-        test_actions: payload.testing ? payload.test_actions.map(action => ({
-          action: action.action,
-          args: [action.args] // Ensure args is an array
-        })) : undefined
+        test_actions: payload.testing
+          ? payload.test_actions.map(a => ({
+              action: a.action,
+              args: Array.isArray(a.args) ? a.args : [a.args]
+            }))
+          : undefined
       };
-
-      const response = await fetch(`${API_BASE_URL}${endpoints.runAgent}`, {
+      const res = await fetch(`${API_BASE_URL}${endpoints.runAgent}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(apiPayload)
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to start agent');
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail.message || JSON.stringify(err.detail));
       }
-
-      const data = await response.json();
-      if (data.session_id) {
-        setSessionId(data.session_id);
-        connectWebSocket(data.session_id);
-      } else {
-        throw new Error('No session ID received');
-      }
-    } catch (error) {
-      console.error('Failed to start agent:', error);
-      alert(`Error: ${error.message}`);
+      const data = await res.json();
+      setSessionId(data.session_id);
+      connectWebSocket(data.session_id);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
     }
   };
 
   const handleStopAgent = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
+    wsRef.current?.close();
   };
 
   const sendInterventionResponse = () => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log('Sending intervention response:', userResponse);
-      
-      const message = {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
         type: 'INTERVENTION_RESPONSE',
-        payload: {
-          input: userResponse || ''
-        }
-      };
-  
-      try {
-        wsRef.current.send(JSON.stringify(message));
-        console.log('Intervention response sent successfully');
-        setUserResponse('');
-        setIsWaitingForResponse(false);
-        
-        // Update step status
-        setSteps(prev => prev.map(step => 
-          step.type === 'interrupt' && step.needsResponse 
-            ? { ...step, needsResponse: false }
-            : step
-        ));
-      } catch (error) {
-        console.error('Failed to send intervention response:', error);
-        alert('Failed to send response to agent');
-      }
+        payload: { input: userResponse || '' }
+      }));
+      setUserResponse('');
+      setIsWaitingForResponse(false);
+      setSteps(prev =>
+        prev.map(s =>
+          s.type === 'interrupt' && s.needsResponse
+            ? { ...s, needsResponse: false }
+            : s
+        )
+      );
     }
   };
 
+  useEffect(() => {
+    const shots = steps.filter(s => s.type === 'screenshot');
+    if (shots.length) setScreenshotIndex(shots.length - 1);
+  }, [steps]);
+
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ bgcolor: 'background.default', color: 'text.primary', minHeight: '100vh' }}>
+      <Container disableGutters maxWidth="lg" sx={{ py: 4, px: 0 }}>
         <Typography variant="h4" gutterBottom>
           Web Agent Interface
         </Typography>
-
-      <AgentController
-        onStart={handleStartAgent}
-        onStop={handleStopAgent}
-        isRunning={connected}
-      />
-
-        {steps.length > 0 && (
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Session Progress
-            </Typography>
-            <ScrollableList>
-              {steps.map((step, index) => (
-                <ListItem key={index} divider>
-                  <Box sx={{ width: '100%' }}>
-                    <Typography variant="subtitle2">
-                      Step {step.step}
-                    </Typography>
-                    
-              {step.type === 'screenshot' && (
-              <Box>
-                {step.image ? (
-                  <>
-                    <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                      Screenshot from step {step.step}
-                    </Typography>
-                    <StyledImage 
-                      src={step.image}
-                      alt={`Screenshot from step ${step.step}`}
-                      onError={(e) => {
-                        console.error('Image failed to load:', {
-                          step: step.step,
-                          url: step.image,
-                          sessionId: sessionId
-                        });
-                        e.target.onerror = null;
-                        e.target.src = '/placeholder-image.png';  // Use a local placeholder
-                      }}
-                      sx={{
-                        maxWidth: '100%',
-                        maxHeight: '400px',
-                        objectFit: 'contain',
-                        mt: 1,
-                        mb: 2,
-                        border: '1px solid #e0e0e0',
-                        borderRadius: 1,
-                        boxShadow: 1
-                      }}
-                    />
-                  </>
-                ) : (
-                  <Typography color="text.secondary" sx={{ mt: 1 }}>
-                    No screenshot available
-                  </Typography>
-                )}
-              </Box>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+          {/* Left: controls and progress */}
+          <Box sx={{ width: '40%' }}>
+            <AgentController onStart={handleStartAgent} onStop={handleStopAgent} isRunning={connected} />
+            {steps.some(s => s.type !== 'screenshot') && (
+              <Paper sx={{ p: 2, mt: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Session Progress
+                </Typography>
+                <ScrollableList>
+                  {steps
+                    .filter(s => s.type !== 'screenshot')
+                    .map((s, i) => (
+                      <ListItem key={i} divider>
+                        <Box sx={{ width: '100%' }}>
+                          <Typography variant="subtitle2">Step {s.step}</Typography>
+                          {s.type === 'action' && (
+                            <Typography>
+                              Action: {s.action}<br />
+                              Args: {JSON.stringify(s.args)}
+                            </Typography>
+                          )}
+                          {s.type === 'interrupt' && s.needsResponse && (
+                            <Box sx={{ mt: 1, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+                              <Typography color="error" gutterBottom>
+                                {s.message}
+                              </Typography>
+                              <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="Type instructions or press Enter to approve"
+                                value={userResponse}
+                                onChange={e => setUserResponse(e.target.value)}
+                                onKeyPress={e => { if (e.key === 'Enter') sendInterventionResponse(); }}
+                                disabled={!isWaitingForResponse}
+                                sx={{ mt: 1 }}
+                              />
+                              <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                                <Button size="small" variant="contained" color="success" onClick={() => { setUserResponse(''); sendInterventionResponse(); }} disabled={!isWaitingForResponse}>
+                                  Approve
+                                </Button>
+                                <Button size="small" variant="contained" color="error" onClick={() => { setUserResponse('exit'); sendInterventionResponse(); }} disabled={!isWaitingForResponse}>
+                                  Stop
+                                </Button>
+                              </Box>
+                            </Box>
+                          )}
+                          {s.type === 'answer' && <Typography>{s.answer}</Typography>}
+                        </Box>
+                      </ListItem>
+                    ))}
+                </ScrollableList>
+              </Paper>
             )}
+          </Box>
 
-                    {step.type === 'action' && (
-                      <Typography>
-                        Action: {step.action}<br/>
-                        Args: {JSON.stringify(step.args)}
-                      </Typography>
-                    )}
-            
-                {step.action && (
-                  <Typography>
-                    Action: {step.action}<br/>
-                    Args: {JSON.stringify(step.args)}
+          {/* Right: screenshot carousel */}
+          <Box sx={{ width: '70%' }}>
+            {(() => {
+              const shots = steps.filter(s => s.type === 'screenshot');
+              if (!shots.length) return null;
+              const current = shots[screenshotIndex];
+              return (
+                <Paper sx={{ p: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Screenshot from step {current.step}
                   </Typography>
-                )}
-
-                {step.type === 'interrupt' && step.needsResponse && (
-                  <Box sx={{ mt: 1, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
-                    <Typography color="error" gutterBottom>
-                      {step.message}
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Press Enter to approve or type alternative instructions"
-                      value={userResponse}
-                      onChange={(e) => setUserResponse(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          sendInterventionResponse();
-                        }
-                      }}
-                      sx={{ mt: 1 }}
-                      disabled={!isWaitingForResponse}
-                    />
-                    <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-                      <Button 
-                        size="small"
-                        variant="contained"
-                        color="success"
-                        onClick={() => {
-                          setUserResponse('');
-                          sendInterventionResponse();
-                        }}
-                        disabled={!isWaitingForResponse}
-                      >
-                        Approve
-                      </Button>
-                      <Button 
-                        size="small"
-                        variant="contained"
-                        color="error"
-                        onClick={() => {
-                          setUserResponse('exit');
-                          sendInterventionResponse();
-                        }}
-                        disabled={!isWaitingForResponse}
-                      >
-                        Stop Agent
-                      </Button>
-                    </Box>
+                  <StyledImage
+                    src={current.image}
+                    alt={`Screenshot from step ${current.step}`}
+                    sx={{ width: '100%', maxHeight: 400, objectFit: 'contain', mt: 1 }}
+                  />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                    <Button size="small" onClick={() => setScreenshotIndex(i => Math.max(i - 1, 0))} disabled={screenshotIndex === 0}>
+                      {'<'}
+                    </Button>
+                    <Button size="small" onClick={() => setScreenshotIndex(i => Math.min(i + 1, shots.length - 1))} disabled={screenshotIndex === shots.length - 1}>
+                      {'>'}
+                    </Button>
                   </Box>
-                )}
-                  </Box>
-                </ListItem>
-              ))}
-            </ScrollableList>
-          </Paper>
-        )}
+                </Paper>
+              );
+            })()}
+          </Box>
+        </Box>
+      </Container>
+      <Box sx={{ position: 'fixed', bottom: 16, right: 16 }}>
+        <IconButton color="inherit" onClick={() => setThemeMode(m => (m === 'light' ? 'dark' : 'light'))}>
+          {themeMode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+        </IconButton>
       </Box>
-    </Container>
+      </Box>
+    </ThemeProvider>
   );
 }
