@@ -29,7 +29,7 @@ from langchain_core.messages import (
 from langchain_mcp_tools import convert_mcp_to_langchain_tools
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.prompts import ChatPromptTemplate
-from .graph import create_agent_graph, AgentState
+from .app.graph import create_agent_graph, AgentState
 import logging # Add logging import
 
 load_dotenv()
