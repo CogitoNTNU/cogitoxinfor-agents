@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import uuid
+import uvicorn
 import asyncio
 import sys
 import os
@@ -513,5 +514,4 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
 # Check if the script is run directly
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run("app.fast_api:app", host="0.0.0.0", port=8000, reload=True)
