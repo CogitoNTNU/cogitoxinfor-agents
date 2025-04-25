@@ -1,63 +1,71 @@
+// websocketService.ts
+// Talks to the Browser‑Box bridge (Socket.IO on :3100)
+
+import { io, Socket } from "socket.io-client";
+
+type JSONValue = string | number | boolean | null | { [x: string]: JSONValue } | JSONValue[];
 
 class WebSocketService {
-  socket: WebSocket | null = null;
-  sessionId: string | null = null;
-  messageListeners: ((data: any) => void)[] = [];
-  
-  connect(sessionId: string): Promise<boolean> {
+  private socket: Socket | null = null;
+
+  /* ------------------------------------------------------------------ */
+  /* Connection                                                         */
+  /* ------------------------------------------------------------------ */
+  connect(): Promise<boolean> {
     return new Promise((resolve) => {
-      this.sessionId = sessionId;
-      this.socket = new WebSocket(`ws://localhost:8000/api/ws/${sessionId}`);
-      
-      this.socket.onopen = () => {
-        console.log('WebSocket connected');
+      if (this.socket?.connected) return resolve(true);
+
+      this.socket = io("http://localhost:3100", { transports: ["websocket"] });
+
+      this.socket.on("connect", () => {
+        console.log("[ws] connected");
         resolve(true);
-      };
-      
-      this.socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        this.messageListeners.forEach(listener => listener(data));
-      };
-      
-      this.socket.onerror = (error) => {
-        console.error('WebSocket error:', error);
+      });
+
+      this.socket.on("connect_error", (err) => {
+        console.error("[ws] connect_error:", err);
         resolve(false);
-      };
-      
-      this.socket.onclose = () => {
-        console.log('WebSocket connection closed');
-      };
+      });
     });
   }
-  
+
   disconnect() {
-    if (this.socket) {
-      this.socket.close();
-      this.socket = null;
-    }
+    this.socket?.disconnect();
+    this.socket = null;
   }
-  
-  sendMessage(message: any) {
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(message));
-    } else {
-      console.error('WebSocket is not connected');
-    }
+
+  /* ------------------------------------------------------------------ */
+  /* Bridge actions                                                     */
+  /* ------------------------------------------------------------------ */
+  startBox(opts: Record<string, JSONValue> = {}) {
+    this.socket?.emit("start-box", opts);
   }
-  
-  onMessage(callback: (data: any) => void) {
-    this.messageListeners.push(callback);
-    return () => {
-      this.messageListeners = this.messageListeners.filter(listener => listener !== callback);
-    };
+
+  stopBox() {
+    this.socket?.emit("stop-box");
   }
-  
-  respondToInterrupt(input: string) {
-    this.sendMessage({
-      type: 'INTERRUPT_RESPONSE',
-      session_id: this.sessionId,
-      input
-    });
+
+  execute(tool: string, input: Record<string, JSONValue> = {}, cb?: (res: any) => void) {
+    if (!this.socket) return console.error("[ws] not connected");
+    this.socket.emit("execute", { tool, input }, cb);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Event subscriptions                                                */
+  /* ------------------------------------------------------------------ */
+  onStatus(cb: (s: any) => void) {
+    this.socket?.on("box-status", cb);
+    return () => this.socket?.off("box-status", cb);
+  }
+
+  onScreenshot(cb: (data: { data: string }) => void) {
+    this.socket?.on("screenshot", cb);
+    return () => this.socket?.off("screenshot", cb);
+  }
+
+  onLog(cb: (line: string, stream: "stdout" | "stderr") => void) {
+    this.socket?.on("box-log", (payload) => cb(payload.data, payload.type));
+    return () => this.socket?.off("box-log", cb);
   }
 }
 

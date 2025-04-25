@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useAgent } from '../context/AgentContext';
+import { useAgent } from '../context/AgentContext'; // Import useAgent
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import { Input } from './ui/input';
 import { AlertTriangle } from 'lucide-react';
 
 export const InterruptDialog: React.FC = () => {
-  const { interruptMessage, respondToInterrupt } = useAgent();
+  const { interruptMessage, respondToInterrupt } = useAgent(); // Use from context
   const [customInput, setCustomInput] = useState('');
 
   const handleApprove = () => {
