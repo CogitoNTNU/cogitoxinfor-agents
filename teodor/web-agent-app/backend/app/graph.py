@@ -102,17 +102,12 @@ def create_agent_graph(tools, checkpointer=None):
         )
         
         try:
-            # Properly configure screenshot tool with parameters that return base64 data
+            # Create a tool message with NO parameters since the tool doesn't accept any
             screenshot_message = AIMessage(
                 content="Taking a screenshot of the current page",
                 tool_calls=[{
                     "name": tool_name,
-                    "args": {
-                        "encoding": "base64",  # Explicitly request base64 encoding
-                        "raw": True,
-                        "fullPage": True,
-                        "type": "jpeg"
-                    },
+                    "args": {},  # No parameters
                     "id": "screenshot_tool_call"
                 }]
             )
