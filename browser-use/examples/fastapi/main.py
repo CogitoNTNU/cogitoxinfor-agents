@@ -109,7 +109,7 @@ class AgentManager:
 			try:
 				llm = ChatOpenAI(model='gpt-4o-mini')
 				agent = {
-					'instance': Agent(task=task, llm=llm),
+					'instance': Agent(task=task, llm=llm, save_conversation_path="logs/conversation.json"),
 					'task': task,
 					'running': False,
 					'created_at': time.time(),
@@ -141,16 +141,20 @@ class AgentManager:
 		if agent_id not in self.agents:
 			return 'not_created'
 
-		agent_data = self.agents[agent_id]
-		agent = agent_data['instance']
+		try:
+			agent_data = self.agents[agent_id]
+			agent = agent_data['instance']
 
-		if agent._stopped:
-			return 'stopped'
-		elif agent._paused:
-			return 'paused'
-		elif agent_data['running']:
-			return 'running'
-		return 'ready'
+			if hasattr(agent, '_stopped') and agent._stopped:
+				return 'stopped'
+			elif hasattr(agent, '_paused') and agent._paused:
+				return 'paused'
+			elif agent_data.get('running', False):
+				return 'running'
+			return 'ready'
+		except Exception as e:
+			logger.error(f"Error checking agent status: {str(e)}")
+			return 'error'
 
 	def set_running(self, agent_id: str, value: bool):
 		if agent_id in self.agents:
@@ -257,6 +261,68 @@ async def get_agent_status(agent_id: str):
 @app.get('/agents')
 async def list_agents():
 	return agent_manager.list_agents()
+
+@app.get('/agent/{agent_id}/screenshot')
+async def get_agent_screenshot(agent_id: str, step: Optional[int] = None):
+    """Get the latest screenshot or a specific step's screenshot"""
+    try:
+        agent = agent_manager.get_agent(agent_id)
+        
+        # If agent has history
+        if hasattr(agent, "history") and agent.history and agent.history.history:
+            # If step is provided, get that specific step's screenshot
+            if step is not None and 0 <= step < len(agent.history.history):
+                screenshot_data = agent.history.history[step].state.screenshot
+            else:
+                # Otherwise return the latest screenshot
+                screenshot_data = agent.history.history[-1].state.screenshot
+                
+            if screenshot_data:
+                # Return the base64 data directly for embedding in an <img> tag
+                return {"screenshot": screenshot_data, "step": step or len(agent.history.history) - 1}
+        
+        # If we can't get a screenshot from history, try to take a new one
+        current_state = await agent.browser_context.get_state()  # Removed use_vision parameter
+        if current_state and current_state.screenshot:
+            return {"screenshot": current_state.screenshot, "step": -1}
+            
+        raise HTTPException(status_code=404, detail="No screenshot available")
+    except Exception as e:
+        logger.error(f"Error getting screenshot for {agent_id}: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+            
+@app.get('/agent/{agent_id}/history')
+async def get_agent_history(agent_id: str):
+    """Get agent history information including screenshot count"""
+    try:
+        agent = agent_manager.get_agent(agent_id)
+        
+        if hasattr(agent, "history") and agent.history and agent.history.history:
+            history_info = {
+                "step_count": len(agent.history.history),
+                "steps": []
+            }
+            
+            # Add summary information for each step
+            for i, step in enumerate(agent.history.history):
+                goal = step.model_output.current_state.next_goal if step.model_output else "No goal available"
+                
+                step_info = {
+                    "step_number": i,
+                    "has_screenshot": step.state.screenshot is not None,
+                    "url": step.state.url,
+                    "title": step.state.title,
+                    "goal": goal
+                }
+                history_info["steps"].append(step_info)
+                
+            return history_info
+        
+        return {"step_count": 0, "steps": []}
+    except Exception as e:
+        logger.error(f"Error getting history for {agent_id}: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get('/logs')

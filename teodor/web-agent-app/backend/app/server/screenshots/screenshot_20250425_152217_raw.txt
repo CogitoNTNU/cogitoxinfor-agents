@@ -1,0 +1,84 @@
+- Ran Playwright code:
+```js
+// <internal code to capture accessibility snapshot>
+```
+
+- Page URL: https://www.google.com/
+- Page Title: Google
+- Page Snapshot
+```yaml
+- generic [ref=s2e2]:
+  - generic [ref=s2e3]:
+    - navigation [ref=s2e4]:
+      - link "Info" [ref=s2e5]:
+        - /url: https://about.google/?fg=1&utm_source=google-NO&utm_medium=referral&utm_campaign=hp-header
+      - link "Store" [ref=s2e6]:
+        - /url: https://store.google.com/NO?utm_source=hp_header&utm_medium=google_ooo&utm_campaign=GS100042&hl=no-NO
+      - generic [ref=s2e8]:
+        - generic [ref=s2e10]:
+          - link "Gmail" [ref=s2e12]:
+            - /url: https://mail.google.com/mail/&ogbl
+          - link "Søk etter bilder" [ref=s2e14]:
+            - /url: https://www.google.com/imghp?hl=no&ogbl
+            - text: Bilder
+        - generic [ref=s2e16]:
+          - button "Google-apper" [ref=s2e17]:
+            - img [ref=s2e18]
+        - link "Logg på" [ref=s2e22]:
+          - /url: https://accounts.google.com/ServiceLogin?hl=no&passive=true&continue=https://www.google.com/&ec=futura_exp_og_so_72776762_e
+          - text: Logg på
+    - generic [ref=s2e25]:
+      - img [ref=s2e26]
+    - search [ref=s2e34]:
+      - generic [ref=s2e35]:
+        - generic [ref=s2e36]:
+          - generic [ref=s2e37]:
+            - generic [ref=s2e38]:
+              - generic [ref=s2e40]:
+                - img [ref=s2e42]
+              - generic [ref=s2e44]:
+                - combobox "Søk" [ref=s2e46]
+              - generic [ref=s2e47]:
+                - button "Inndataverktøy" [ref=s2e49]:
+                  - img [ref=s2e51]
+                - button "Søk med bilde" [ref=s2e53]:
+                  - img [ref=s2e54]
+          - generic [ref=s2e58]:
+            - button "Google-søk" [ref=s2e59]
+            - button "Jeg prøver lykken" [ref=s2e60]
+    - generic [ref=s2e63]:
+      - generic
+      - generic
+      - generic [ref=s2e71]:
+        - text: "Google på:"
+        - link "English" [ref=s2e72]:
+          - /url: https://www.google.com/setprefs?sig=0_IcHCO2V0cGRk6ZlwO4ZxmZ8rOnY%3D&hl=en&source=homepage&sa=X&ved=0ahUKEwihwcbFo_OMAxUqKRAIHfWLPA0Q2ZgBCBY
+    - contentinfo [ref=s2e75]:
+      - generic [ref=s2e76]:
+        - text: Norge
+        - generic [ref=s2e78]:
+          - text: "Åpenhetsloven og Google Norway AS: Les redegjørelse for
+              aktsomhetsvurderinger"
+          - link "her" [ref=s2e80]:
+            - /url: https://www.gstatic.com/gumdrop/sustainability/2023-norwegian-transparency-act-statement.pdf
+          - text: .
+      - generic [ref=s2e81]:
+        - generic [ref=s2e82]:
+          - link "Annonsering" [ref=s2e83]:
+            - /url: https://www.google.com/intl/no_no/ads/?subid=ww-ww-et-g-awa-a-g_hpafoot1_1!o2&utm_source=google.com&utm_medium=referral&utm_campaign=google_hpafooter&fg=1
+          - link "Bedrifter" [ref=s2e84]:
+            - /url: https://www.google.com/services/?subid=ww-ww-et-g-awa-a-g_hpbfoot1_1!o2&utm_source=google.com&utm_medium=referral&utm_campaign=google_hpbfooter&fg=1
+          - link "Slik fungerer Søk" [ref=s2e85]:
+            - /url: https://google.com/search/howsearchworks/?fg=1
+        - 'link "Vårt tredje tiår med klimatiltak: Se fremgangen vår" [ref=s2e87]':
+          - /url: https://sustainability.google/intl/no/carbon-free/?utm_source=googlehpfooter&utm_medium=housepromos&utm_campaign=bottom-footer&utm_content=
+          - text: "Vårt tredje tiår med klimatiltak: Se fremgangen vår"
+        - generic [ref=s2e90]:
+          - link "Personvern" [ref=s2e91]:
+            - /url: https://policies.google.com/privacy?hl=no&fg=1
+          - link "Vilkår" [ref=s2e92]:
+            - /url: https://policies.google.com/terms?hl=no&fg=1
+          - generic [ref=s2e94]:
+            - button "Innstillinger" [ref=s2e96]: Innstillinger
+  - generic
+```
