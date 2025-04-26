@@ -1,6 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { agentApi } from '../services/api';
 
+// Add LogEntry interface
+interface LogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  source?: string;
+}
+
 interface AgentContextProps {
   children: React.ReactNode;
 }
@@ -13,8 +21,11 @@ interface AgentContextType {
   events: any[];
   currentAgentId: string | null;
   actionHistory: any[];
+  logs: LogEntry[];
+  clearLogs: () => void;
+  fetchLatestScreenshot: (stepNumber?: number) => Promise<string | null>;
   setCurrentAgentId: (id: string | null) => void; // Add setter for currentAgentId
-  runAgent: (task: string) => Promise<void>;      // Add runAgent method
+  runAgent: (task: string) => Promise<any>;      // Changed return type to any
   clearScreenshots: () => void;
   loadAgentHistory: (agentId: string) => void;
   pauseAgent: () => void;
@@ -32,6 +43,9 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
   const [events, setEvents] = useState<any[]>([]);
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
   const [actionHistory, setActionHistory] = useState<any[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logEventSource, setLogEventSource] = useState<EventSource | null>(null);
+
   // Clear all screenshots
   const clearScreenshots = useCallback(() => {
     setScreenshots([]);
@@ -49,7 +63,7 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
       const response = await agentApi.runAgent(currentAgentId, task);
       console.log("Agent run response:", response);
       setIsRunning(true);
-      return response;
+      // Don't return the response
     } catch (error) {
       console.error("Error running agent:", error);
       throw error;
@@ -65,13 +79,27 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
       if (response.data) {
         // Set all history data
         setEvents(response.data.events || []);
-        setScreenshots(response.data.steps?.filter(step => step.has_screenshot) || []);
+        
+        // Handle screenshots with URLs
+        const screenshotsWithUrls = response.data.steps
+          ?.filter(step => step.has_screenshot)
+          .map(step => ({
+            step_number: step.step_number,
+            url: step.url,
+            title: step.title,
+            screenshot_url: step.screenshot_url,  // Use saved URL from backend
+            goal: step.goal
+          })) || [];
+          
+        setScreenshots(screenshotsWithUrls);
+        
         setActionHistory(response.data.steps?.map(step => ({
           step_number: step.step_number,
           goal: step.goal,
           url: step.url,
           title: step.title
         })) || []);
+        
         setFinalAnswer(response.data.final_answer || null);
       }
     } catch (error) {
@@ -142,7 +170,66 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
     
     return () => clearInterval(intervalId);
   }, [currentAgentId]);
-  
+
+  // Clear logs
+  const clearLogs = useCallback(() => {
+    setLogs([]);
+  }, []);
+
+  // Fetch latest screenshot or specific step screenshot
+  const fetchLatestScreenshot = useCallback(async (stepNumber?: number) => {
+    if (!currentAgentId) return null;
+    
+    try {
+      const params = stepNumber !== undefined ? { step: stepNumber } : {};
+      const response = await agentApi.getAgentScreenshot(currentAgentId, params);
+      return response.data?.screenshot || null;
+    } catch (error) {
+      console.error("Error fetching screenshot:", error);
+      return null;
+    }
+  }, [currentAgentId]);
+
+  // Connect to logs SSE endpoint when agent starts running
+  useEffect(() => {
+    if (isRunning && currentAgentId) {
+      // Close existing connection if any
+      if (logEventSource) {
+        logEventSource.close();
+      }
+      
+      // Connect to logs endpoint
+      const eventSource = new EventSource(`${agentApi.getBaseUrl()}/logs`);
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const logEntry = JSON.parse(event.data);
+          setLogs(prevLogs => [...prevLogs, logEntry]);
+        } catch (error) {
+          console.error("Error parsing log data:", error);
+        }
+      };
+      
+      eventSource.onerror = () => {
+        console.error("SSE connection error");
+        eventSource.close();
+      };
+      
+      setLogEventSource(eventSource);
+      
+      return () => {
+        eventSource.close();
+        setLogEventSource(null);
+      };
+    }
+    
+    // Clean up connection when agent stops
+    if (!isRunning && logEventSource) {
+      logEventSource.close();
+      setLogEventSource(null);
+    }
+  }, [isRunning, currentAgentId]);
+
   return (
     <AgentContext.Provider
       value={{
@@ -152,9 +239,12 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
         finalAnswer,
         events,
         currentAgentId,
+        actionHistory,
+        logs,
+        clearLogs,
+        fetchLatestScreenshot,
         setCurrentAgentId,  // Expose the setter
         runAgent,           // Expose the run method
-        actionHistory,
         clearScreenshots,
         loadAgentHistory,
         pauseAgent,
