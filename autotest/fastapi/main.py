@@ -172,6 +172,23 @@ class AgentManager:
 		return {
 			agent_id: {'task': data['task'], 'status': self.get_agent_status(agent_id)} for agent_id, data in self.agents.items()
 		}
+		
+	def save_agent_screenshot(self, agent_id: str, screenshot_data: str, step_number: int = None) -> str:
+		"""Save a screenshot to disk and return the URL path"""
+		# Create agent-specific directory
+		agent_dir = Path(SCREENSHOTS_DIR) / agent_id
+		agent_dir.mkdir(exist_ok=True)
+		
+		# Generate filename
+		timestamp = time.strftime("%Y%m%d-%H%M%S")
+		step_info = f"_step{step_number}" if step_number is not None else ""
+		filename = f"{timestamp}{step_info}.png"
+		filepath = agent_dir / filename
+		
+		if b64_to_png(screenshot_data, filepath):
+			# Return the URL path that can be used by the frontend
+			return f"/screenshots/{agent_id}/{filename}"
+		return None
 
 	def save_agent_history(self, agent_id: str, task: str):
 		"""Save agent history to a file"""
@@ -238,22 +255,6 @@ class AgentManager:
 			logger.error(f"Error saving history for agent {agent_id}: {str(e)}")
 			return None
 
-	def save_agent_screenshot(self, agent_id: str, screenshot_data: str, step_number: int = None) -> str:
-		"""Save a screenshot to disk and return the URL path"""
-		# Create agent-specific directory
-		agent_dir = Path(SCREENSHOTS_DIR) / agent_id
-		agent_dir.mkdir(exist_ok=True)
-		
-		# Generate filename
-		timestamp = time.strftime("%Y%m%d-%H%M%S")
-		step_info = f"_step{step_number}" if step_number is not None else ""
-		filename = f"{timestamp}{step_info}.png"
-		filepath = agent_dir / filename
-		
-		if b64_to_png(screenshot_data, filepath):
-			# Return the URL path that can be used by the frontend
-			return f"/screenshots/{agent_id}/{filename}"
-		return None
 
 
 # Create a singleton instance
