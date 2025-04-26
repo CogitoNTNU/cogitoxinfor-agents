@@ -12,6 +12,7 @@ interface AgentContextType {
   finalAnswer: string | null;
   events: any[];
   currentAgentId: string | null;
+  actionHistory: any[];
   setCurrentAgentId: (id: string | null) => void; // Add setter for currentAgentId
   runAgent: (task: string) => Promise<void>;      // Add runAgent method
   clearScreenshots: () => void;
@@ -30,7 +31,7 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
   const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
-  
+  const [actionHistory, setActionHistory] = useState<any[]>([]);
   // Clear all screenshots
   const clearScreenshots = useCallback(() => {
     setScreenshots([]);
@@ -60,10 +61,17 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
     try {
       const response = await agentApi.getAgentHistory(agentId);
       setCurrentAgentId(agentId);
-      // Process the agent history data
+      
       if (response.data) {
+        // Set all history data
         setEvents(response.data.events || []);
-        setScreenshots(response.data.screenshots || []);
+        setScreenshots(response.data.steps?.filter(step => step.has_screenshot) || []);
+        setActionHistory(response.data.steps?.map(step => ({
+          step_number: step.step_number,
+          goal: step.goal,
+          url: step.url,
+          title: step.title
+        })) || []);
         setFinalAnswer(response.data.final_answer || null);
       }
     } catch (error) {
@@ -145,7 +153,8 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
         events,
         currentAgentId,
         setCurrentAgentId,  // Expose the setter
-        runAgent,           // Expose the run method 
+        runAgent,           // Expose the run method
+        actionHistory,
         clearScreenshots,
         loadAgentHistory,
         pauseAgent,

@@ -421,31 +421,46 @@ async def get_agent_history(agent_id: str, save_screenshots: bool = True):
         if hasattr(agent, "history") and agent.history and agent.history.history:
             history_info = {
                 "step_count": len(agent.history.history),
-                "steps": []
+                "steps": [],
+                "events": [],
+                "final_answer": getattr(agent, "final_answer", None) if hasattr(agent, "final_answer") else None
             }
+            
+            # Extract events if available
+            if hasattr(agent.history, "model_actions") and callable(agent.history.model_actions):
+                history_info["events"].extend([
+                    {"type": "model_action", "payload": action} 
+                    for action in agent.history.model_actions()
+                ])
+                
+            if hasattr(agent.history, "errors") and callable(agent.history.errors):
+                history_info["events"].extend([
+                    {"type": "error", "payload": error} 
+                    for error in agent.history.errors()
+                ])
             
             # Add summary information for each step
             for i, step in enumerate(agent.history.history):
-                goal = step.model_output.current_state.next_goal if step.model_output else "No goal available"
+                goal = step.model_output.current_state.next_goal if hasattr(step, "model_output") and step.model_output else "No goal available"
                 
                 # Save screenshot if available and requested
                 screenshot_url = None
-                if save_screenshots and step.state.screenshot:
+                if save_screenshots and hasattr(step, "state") and hasattr(step.state, "screenshot") and step.state.screenshot:
                     screenshot_url = agent_manager.save_agent_screenshot(agent_id, step.state.screenshot, i)
                 
                 step_info = {
                     "step_number": i,
-                    "has_screenshot": step.state.screenshot is not None,
-                    "screenshot_url": screenshot_url,  # Add URL to the response
-                    "url": step.state.url,
-                    "title": step.state.title,
+                    "has_screenshot": hasattr(step, "state") and hasattr(step.state, "screenshot") and step.state.screenshot is not None,
+                    "screenshot_url": screenshot_url,
+                    "url": step.state.url if hasattr(step.state, "url") else None,
+                    "title": step.state.title if hasattr(step.state, "title") else None,
                     "goal": goal
                 }
                 history_info["steps"].append(step_info)
                 
             return history_info
         
-        return {"step_count": 0, "steps": []}
+        return {"step_count": 0, "steps": [], "events": []}
     except Exception as e:
         logger.error(f"Error getting history for {agent_id}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
