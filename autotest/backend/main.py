@@ -87,6 +87,7 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 import base64
 from pathlib import Path
 import json
+import shutil
 
 # Define and create screenshots directory
 SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'screenshots')
@@ -95,6 +96,10 @@ os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 # Mount static directories
 app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
 app.mount('/screenshots', StaticFiles(directory=SCREENSHOTS_DIR), name='screenshots')
+
+# Define and create profiles directory
+PROFILES_DIR = os.path.join(os.path.dirname(__file__), 'profiles')
+os.makedirs(PROFILES_DIR, exist_ok=True)
 
 class TaskRequest(BaseModel):
     agent_id: str
@@ -122,12 +127,64 @@ class AgentManager:
 				raise ValueError(f'Agent {agent_id} already exists')
 
 			try:
+				# Create custom browser config for more human-like behavior
+				from browser_use import BrowserConfig
+				from browser_use.browser.context import BrowserContextConfig
+				from browser_use import Browser
+				
+				# Configure browser with human-like settings
+				browser_config = BrowserConfig(
+					headless=True,  # Show the browser UI
+					disable_security=True,  # Needed for some websites
+					extra_chromium_args=[
+						"--disable-blink-features=AutomationControlled",  # Hide automation flags
+						"--disable-features=IsolateOrigins,site-per-process"  # Improved stability
+						# Remove the user-data-dir parameter from here
+					]
+				)
+
+				# Create cookies directory if it doesn't exist
+				COOKIES_DIR = os.path.join(os.path.dirname(__file__), 'cookies')
+				os.makedirs(COOKIES_DIR, exist_ok=True)
+
+				# Configure browser context with human-like settings
+				context_config = BrowserContextConfig(
+					cookies_file=os.path.join(COOKIES_DIR, f"{agent_id}.json"),  # Save cookies per agent
+					wait_for_network_idle_page_load_time=3.0,  # Wait longer for page loads
+					browser_window_size={'width': 1366, 'height': 768},  # Common screen resolution
+					locale='en-US',
+					user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+					highlight_elements=True,
+					viewport_expansion=700  # Capture more content for context
+				)
+				
+				# Update the context config in the browser config
+				browser_config.new_context_config = context_config
+				
+				# Create browser instance explicitly
+				browser = Browser(config=browser_config)
+
+				# Create browser context
+				browser_context = await browser.new_context(config=context_config)
+
+				# Navigate to Google as the start page
+				page = await browser_context.get_current_page()
+				if page:
+					try:
+						await page.goto("https://www.google.com")
+						logger.info("Successfully navigated to Google start page")
+					except Exception as e:
+						logger.error(f"Failed to navigate to Google: {str(e)}")
+
 				llm = ChatOpenAI(model='gpt-4o-mini')
 				agent_instance = Agent(
 					task=task,
 					llm=llm,
+					browser=browser,  # Pass the custom browser
+					browser_context=browser_context,  # Pass the custom context
 					save_conversation_path="logs/conversation.json",
-					register_new_step_callback=make_step_logger(agent_id)
+					register_new_step_callback=make_step_logger(agent_id),
+					register_done_callback=lambda history: self.save_agent_history(agent_id, task)
 				)
 				agent = {
 					'instance': agent_instance,
@@ -137,7 +194,7 @@ class AgentManager:
 					'last_active': time.time(),
 				}
 				self.agents[agent_id] = agent
-				logger.info(f'Created agent {agent_id}. Total agents: {len(self.agents)}')
+				logger.info(f'Created agent {agent_id} with custom browser. Total agents: {len(self.agents)}')
 			except Exception as e:
 				logger.error(f'Failed to create agent {agent_id}: {str(e)}')
 				raise
@@ -350,19 +407,25 @@ async def run_agent(request: TaskRequest):
             await agent_manager.create_agent(request.agent_id, request.task)
 
         agent = agent_manager.get_agent(request.agent_id)
+        
+        if agent.browser_context is None or agent.browser is None:
+            logger.error(f"Agent {request.agent_id} has uninitialized browser components")
+            raise HTTPException(status_code=500, detail="Browser initialization failure")
+            
+        # Check if browser session is ready
+        browser_state = await agent.browser_context.get_state()
+        logger.info(f"Browser state before running: {browser_state is not None}")
+        
         agent_manager.set_running(request.agent_id, True)
 
-        # Run in background task to not block, and log browser actions as JSON
-        task = asyncio.create_task(
-            agent.run(on_step_end=make_action_logger(request.agent_id))
-        )
+        # Run in background task to not block
+        task = asyncio.create_task(agent.run())
 
         # Add completion callback for debugging
         def done_callback(future):
             try:
                 result = future.result()
-                # Save history after agent completes (this saves more than just actions)
-                agent_manager.save_agent_history(request.agent_id, request.task)
+                # History is now saved via register_done_callback
             except Exception as e:
                 logger.error(f'Agent {request.agent_id} failed: {str(e)}')
             finally:
