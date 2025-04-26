@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
-import { PlayIcon, Square, Settings, Plus, MinusCircle, Info } from 'lucide-react';
+import { PlayIcon, Square, Plus, MinusCircle, Info } from 'lucide-react';
 import { useAgent } from '../context/AgentContext';
-import { ConfigModal } from './ConfigModal';
+// Removed ConfigModal import
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
@@ -123,9 +123,9 @@ const formatArguments = (value: string, action: keyof typeof TOOL_CONFIGURATIONS
 
 
 export const AgentControls: React.FC = () => {
-  const { isRunning, startAgent, stopAgent } = useAgent();
+  const { isRunning, runAgent, stopAgent } = useAgent(); // Changed startAgent to runAgent
   const [query, setQuery] = useState('');
-  const [configOpen, setConfigOpen] = useState(false);
+  // Removed configOpen state
   const [testActions, setTestActions] = useState<Array<{ action: keyof typeof TOOL_CONFIGURATIONS, args: string }>>([]);
   const [testActionsOpen, setTestActionsOpen] = useState(true);
   const [humanIntervention, setHumanIntervention] = useState(true);
@@ -198,7 +198,7 @@ export const AgentControls: React.FC = () => {
         query: isTestMode ? '' : query.trim(),
         test_actions: isTestMode ? formattedActions : [],
       };
-      await startAgent(payload);
+      await runAgent(payload); // Pass the payload object
     }
   };
   
@@ -245,13 +245,7 @@ export const AgentControls: React.FC = () => {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center justify-between">
             <span>Agent Controls</span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setConfigOpen(true)}
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
+            {/* Removed Settings button */}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 flex-grow overflow-hidden">
@@ -410,8 +404,6 @@ export const AgentControls: React.FC = () => {
           )}
         </CardFooter>
       </Card>
-      
-      <ConfigModal open={configOpen} onOpenChange={setConfigOpen} />
     </>
   );
 };

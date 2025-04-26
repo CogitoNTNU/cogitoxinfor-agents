@@ -35,7 +35,6 @@ export const agentApi = {
     return axios.get(`${API_URL}/agent/${agentId}/screenshot${stepParam}`);
   },
   
-  // Get agent history information
-  getAgentHistory: (agentId) => 
-    axios.get(`${API_URL}/agent/${agentId}/history`)
+  // Stream real-time logs and screenshots via Server-Sent Events
+  streamAgentEvents: () => new EventSource(`${API_URL}/logs`),
 };

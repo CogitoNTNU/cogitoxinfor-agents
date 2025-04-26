@@ -1,0 +1,452 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playwright MCP Browser Playground</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        h1 {
+            margin: 0;
+            color: #333;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.running {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.stopped {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .control-panel {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .browser-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .browser-view {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+            min-height: 600px;
+            background-color: #f9f9f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .browser-view img {
+            max-width: 100%;
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+        .input-row input {
+            flex: 1;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background-color: #0069d9;
+        }
+        button.secondary {
+            background-color: #6c757d;
+        }
+        button.secondary:hover {
+            background-color: #5a6268;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        .log-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .log-output {
+            height: 200px;
+            overflow-y: auto;
+            background-color: #222;
+            color: #f0f0f0;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .log-entry {
+            margin: 0;
+            padding: 2px 0;
+        }
+        .log-entry.stderr {
+            color: #ffaaaa;
+        }
+        .refresh-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .checkbox-group input {
+            width: auto;
+        }
+        .tool-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .tool-form {
+            display: flex;
+            gap: 10px;
+        }
+        .tool-form select, .tool-form input {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Playwright MCP Browser Playground</h1>
+            <div class="status stopped" id="status-indicator">Stopped</div>
+        </div>
+        
+        <div class="control-panel">
+            <h2>Browser Control</h2>
+            <div class="form-group">
+                <label for="browser-select">Browser</label>
+                <select id="browser-select">
+                    <option value="chrome">Chrome</option>
+                    <option value="firefox">Firefox</option>
+                    <option value="webkit">WebKit</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="headless-mode">
+                    <label for="headless-mode">Headless Mode</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="vision-mode" checked>
+                    <label for="vision-mode">Vision Mode</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="user-data-dir">User Data Directory (optional)</label>
+                <input type="text" id="user-data-dir" placeholder="/path/to/user/data/dir">
+            </div>
+            <div class="button-group">
+                <button id="start-button">Start Browser</button>
+                <button id="stop-button" class="secondary" disabled>Stop Browser</button>
+            </div>
+        </div>
+        
+        <div class="browser-container">
+            <div class="refresh-controls">
+                <h2>Browser View</h2>
+                <div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="auto-refresh" checked>
+                        <label for="auto-refresh">Auto Refresh</label>
+                    </div>
+                    <button id="refresh-now">Refresh Now</button>
+                </div>
+            </div>
+            <div class="browser-view">
+                <img id="browser-image" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" alt="Browser not running">
+            </div>
+        </div>
+        
+        <div class="tool-panel">
+            <h2>Tool Execution</h2>
+            <div class="form-group">
+                <label for="url-input">Navigate to URL</label>
+                <div class="input-row">
+                    <input type="url" id="url-input" placeholder="https://example.com">
+                    <button id="navigate-button">Go</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="tool-select">Execute Custom Tool</label>
+                <div class="tool-form">
+                    <select id="tool-select">
+                        <option value="browser_navigate">browser_navigate</option>
+                        <option value="browser_go_back">browser_go_back</option>
+                        <option value="browser_go_forward">browser_go_forward</option>
+                        <option value="browser_take_screenshot">browser_take_screenshot</option>
+                        <option value="browser_snapshot">browser_snapshot</option>
+                        <option value="browser_click">browser_click</option>
+                        <option value="browser_type">browser_type</option>
+                    </select>
+                    <input type="text" id="tool-input" placeholder='{"url": "https://example.com"}'>
+                    <button id="execute-button">Execute</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="log-container">
+            <h2>Logs</h2>
+            <div class="log-output" id="log-output"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <script>
+        // Connect to the bridge server
+        const socket = io('http://localhost:3100');
+        
+        // DOM Elements
+        const statusIndicator = document.getElementById('status-indicator');
+        const startButton = document.getElementById('start-button');
+        const stopButton = document.getElementById('stop-button');
+        const browserSelect = document.getElementById('browser-select');
+        const headlessMode = document.getElementById('headless-mode');
+        const visionMode = document.getElementById('vision-mode');
+        const userDataDir = document.getElementById('user-data-dir');
+        const browserImage = document.getElementById('browser-image');
+        const autoRefresh = document.getElementById('auto-refresh');
+        const refreshNow = document.getElementById('refresh-now');
+        const urlInput = document.getElementById('url-input');
+        const navigateButton = document.getElementById('navigate-button');
+        const toolSelect = document.getElementById('tool-select');
+        const toolInput = document.getElementById('tool-input');
+        const executeButton = document.getElementById('execute-button');
+        const logOutput = document.getElementById('log-output');
+        
+        // Update UI based on server status
+        function updateStatus(status) {
+            if (status === 'running') {
+                statusIndicator.textContent = 'Running';
+                statusIndicator.className = 'status running';
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                browserSelect.disabled = true;
+                headlessMode.disabled = true;
+                visionMode.disabled = true;
+                userDataDir.disabled = true;
+            } else {
+                statusIndicator.textContent = 'Stopped';
+                statusIndicator.className = 'status stopped';
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                browserSelect.disabled = false;
+                headlessMode.disabled = false;
+                visionMode.disabled = false;
+                userDataDir.disabled = false;
+            }
+        }
+        
+        // Add log entry
+        function addLog(message, type = 'stdout') {
+            const entry = document.createElement('p');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = message;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+        
+        // Start the MCP server
+        startButton.addEventListener('click', () => {
+            const options = {
+                browser: browserSelect.value,
+                headless: headlessMode.checked,
+                vision: visionMode.checked
+            };
+            
+            if (userDataDir.value.trim()) {
+                options.userDataDir = userDataDir.value.trim();
+            }
+            
+            socket.emit('start-mcp', options);
+            addLog('Starting MCP server...');
+        });
+        
+        // Stop the MCP server
+        stopButton.addEventListener('click', () => {
+            socket.emit('stop-mcp');
+            addLog('Stopping MCP server...');
+        });
+        
+        // Navigate to URL
+        navigateButton.addEventListener('click', () => {
+            const url = urlInput.value.trim();
+            if (!url) {
+                addLog('Please enter a URL', 'stderr');
+                return;
+            }
+            
+            socket.emit('execute-tool', {
+                tool: 'browser_navigate',
+                input: { url }
+            }, (result) => {
+                if (result.error) {
+                    addLog(`Error: ${result.error}`, 'stderr');
+                } else {
+                    addLog(`Navigated to ${url}`);
+                }
+            });
+        });
+        
+        // Execute custom tool
+        executeButton.addEventListener('click', () => {
+            const tool = toolSelect.value;
+            let input = {};
+            
+            try {
+                const inputText = toolInput.value.trim();
+                if (inputText) {
+                    input = JSON.parse(inputText);
+                }
+            } catch (err) {
+                addLog(`Error parsing input: ${err.message}`, 'stderr');
+                return;
+            }
+            
+            socket.emit('execute-tool', { tool, input }, (result) => {
+                if (result.error) {
+                    addLog(`Error: ${result.error}`, 'stderr');
+                } else {
+                    addLog(`Executed ${tool}`);
+                    // For snapshot, show the result
+                    if (tool === 'browser_snapshot') {
+                        addLog(`Snapshot received: ${JSON.stringify(result).substring(0, 100)}...`);
+                    }
+                }
+            });
+        });
+        
+        // Refresh screenshot manually
+        refreshNow.addEventListener('click', () => {
+            socket.emit('execute-tool', {
+                tool: 'browser_take_screenshot',
+                input: {}
+            }, (result) => {
+                if (!result.error && result.output && result.output.data) {
+                    browserImage.src = result.output.data;
+                    addLog('Screenshot refreshed manually');
+                }
+            });
+        });
+        
+        // Socket event handlers
+        socket.on('connect', () => {
+            addLog('Connected to MCP Bridge Server');
+        });
+        
+        socket.on('mcp-status', (data) => {
+            updateStatus(data.status);
+            addLog(`MCP server ${data.status}${data.port ? ` on port ${data.port}` : ''}`);
+        });
+        
+        socket.on('mcp-log', (data) => {
+            addLog(data.data, data.type);
+        });
+        
+        socket.on('screenshot', (data) => {
+            if (autoRefresh.checked) {
+                browserImage.src = data.data;
+            }
+        });
+        
+        socket.on('connect_error', (err) => {
+            addLog(`Connection error: ${err.message}`, 'stderr');
+        });
+        
+        socket.on('disconnect', () => {
+            addLog('Disconnected from MCP Bridge Server', 'stderr');
+            updateStatus('stopped');
+        });
+        
+        // Initialize tool input based on selected tool
+        toolSelect.addEventListener('change', () => {
+            switch (toolSelect.value) {
+                case 'browser_navigate':
+                    toolInput.value = '{"url": "https://example.com"}';
+                    break;
+                case 'browser_click':
+                    toolInput.value = '{"element": "Submit button", "ref": "element-id-from-snapshot"}';
+                    break;
+                case 'browser_type':
+                    toolInput.value = '{"element": "Search box", "ref": "element-id-from-snapshot", "text": "search query"}';
+                    break;
+                default:
+                    toolInput.value = '';
+            }
+        });
+        
+        // Initialize
+        updateStatus('stopped');
+        addLog('MCP Browser Playground initialized');
+    </script>
+</body>
+</html>

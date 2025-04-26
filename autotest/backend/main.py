@@ -6,6 +6,8 @@ from logging.handlers import RotatingFileHandler
 from queue import Queue
 from threading import Lock
 from typing import Any, Dict, Optional
+import json
+from datetime import datetime, timezone
 
 import psutil
 from fastapi import FastAPI, HTTPException
@@ -49,6 +51,10 @@ agent_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(le
 log_queue = Queue()
 log_lock = Lock()
 
+# Create a queue for real-time screenshot messages
+screenshot_queue = Queue()
+screenshot_lock = Lock()
+
 
 class LogHandler(logging.Handler):
 	def emit(self, record):
@@ -80,6 +86,7 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 # Import required modules for screenshot handling
 import base64
 from pathlib import Path
+import json
 
 # Define and create screenshots directory
 SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'screenshots')
@@ -116,8 +123,14 @@ class AgentManager:
 
 			try:
 				llm = ChatOpenAI(model='gpt-4o-mini')
+				agent_instance = Agent(
+					task=task,
+					llm=llm,
+					save_conversation_path="logs/conversation.json",
+					register_new_step_callback=make_step_logger(agent_id)
+				)
 				agent = {
-					'instance': Agent(task=task, llm=llm, save_conversation_path="logs/conversation.json"),
+					'instance': agent_instance,
 					'task': task,
 					'running': False,
 					'created_at': time.time(),
@@ -273,6 +286,57 @@ def b64_to_png(base64_str: str, output_path: Path) -> bool:
         logger.error(f"Failed to save screenshot: {str(e)}")
         return False
 
+def make_step_logger(agent_id: str):
+    """Returns a callback that logs each step and saves its screenshot."""
+    def step_logger(state, output, step_number):
+        # 1) Log URL/title
+        logger = logging.getLogger('browser_use')
+        logger.info(f"Step {step_number:03d} → {state.url} ({state.title!r})")
+        # 2) Persist screenshot if present
+        if state.screenshot:
+            agent_dir = Path(SCREENSHOTS_DIR) / agent_id
+            agent_dir.mkdir(parents=True, exist_ok=True)
+            img = base64.b64decode(state.screenshot)
+            path = agent_dir / f"step_{step_number:03d}.png"
+            with open(path, 'wb') as f:
+                f.write(img)
+            # Also enqueue screenshot for live streaming
+            with screenshot_lock:
+                screenshot_queue.put({
+                    "agent_id": agent_id,
+                    "step": step_number,
+                    "data": state.screenshot
+                })
+    return step_logger
+
+# --- Action logger for browser actions as JSON ---
+def make_action_logger(agent_id: str):
+    """Returns an async callback that logs each action as JSON to logs/browser_actions.log."""
+    async def action_logger(agent):
+        history = agent.state.history
+        if history.history:
+            last = history.history[-1]
+            result = last.result[-1]
+            # Build full action payloads list
+            actions = [a.model_dump(exclude_none=True) for a in last.model_output.action]
+            # Retrieve agent brain state
+            brain = last.model_output.current_state
+            # Construct enriched log record
+            record = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "step": len(history.history),
+                "url": last.state.url,
+                "memory": brain.memory,
+                "next_goal": brain.next_goal,
+                "actions": actions,
+                "success": result.error is None,
+                "error": result.error
+            }
+            log_path = os.path.join(LOGS_DIR, 'browser_actions.log')
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(record) + '\n')
+    return action_logger
+
 @app.get('/')
 async def read_root():
 	return FileResponse(os.path.join(STATIC_DIR, 'index.html'))
@@ -288,14 +352,16 @@ async def run_agent(request: TaskRequest):
         agent = agent_manager.get_agent(request.agent_id)
         agent_manager.set_running(request.agent_id, True)
 
-        # Run in background task to not block
-        task = asyncio.create_task(agent.run())
+        # Run in background task to not block, and log browser actions as JSON
+        task = asyncio.create_task(
+            agent.run(on_step_end=make_action_logger(request.agent_id))
+        )
 
         # Add completion callback for debugging
         def done_callback(future):
             try:
                 result = future.result()
-                # Save history after agent completes
+                # Save history after agent completes (this saves more than just actions)
                 agent_manager.save_agent_history(request.agent_id, request.task)
             except Exception as e:
                 logger.error(f'Agent {request.agent_id} failed: {str(e)}')
@@ -468,16 +534,24 @@ async def get_agent_history(agent_id: str, save_screenshots: bool = True):
 
 @app.get('/logs')
 async def event_stream():
-	async def generate():
-		while True:
-			if not log_queue.empty():
-				with log_lock:
-					while not log_queue.empty():
-						log_entry = log_queue.get()
-						yield {'event': 'log', 'data': log_entry}
-			await asyncio.sleep(0.1)
+    async def generate():
+        while True:
+            # Logs
+            if not log_queue.empty():
+                with log_lock:
+                    while not log_queue.empty():
+                        log_entry = log_queue.get()
+                        yield {'event': 'log', 'data': log_entry}
+            # Screenshots
+            if not screenshot_queue.empty():
+                with screenshot_lock:
+                    while not screenshot_queue.empty():
+                        msg = screenshot_queue.get()
+                        # Send screenshot payload as JSON string
+                        yield {'event': 'screenshot', 'data': json.dumps(msg)}
+            await asyncio.sleep(0.1)
 
-	return EventSourceResponse(generate())
+    return EventSourceResponse(generate())
 
 
 @app.get('/system/stats')

@@ -17,6 +17,7 @@ function BrowserView({ agentId }) {
   const [currentStep, setCurrentStep] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1000); // ms between steps
+  const [logLines, setLogLines] = useState([]);
 
   // Fetch agent status and history
   useEffect(() => {
@@ -97,6 +98,25 @@ function BrowserView({ agentId }) {
     
     return () => clearInterval(playbackInterval);
   }, [isPlaying, history.step_count, playbackSpeed]);
+
+  useEffect(() => {
+    if (!agentId) return;
+    const es = agentApi.streamAgentEvents();
+    // Handle incoming log lines
+    es.addEventListener('log', e => {
+      setLogLines(prev => [...prev, e.data]);
+    });
+    // Handle incoming screenshots
+    es.addEventListener('screenshot', e => {
+      const { agent_id, data } = JSON.parse(e.data);
+      if (agent_id === agentId) {
+        setScreenshot(data);
+      }
+    });
+    return () => {
+      es.close();
+    };
+  }, [agentId]);
 
   const handlePrevious = () => {
     setCurrentStep(prevStep => Math.max(0, prevStep - 1));
@@ -205,6 +225,19 @@ function BrowserView({ agentId }) {
             {!status && <CircularProgress size={20} />}
           </Box>
         )}
+      </Paper>
+
+      {/* Live Logs */}
+      <Paper sx={{ p: 1, mb: 1, height: 200, overflow: 'auto', backgroundColor: '#000' }}>
+        {logLines.map((line, index) => (
+          <Typography
+            key={index}
+            variant="body2"
+            sx={{ color: '#0f0', fontFamily: 'monospace' }}
+          >
+            {line}
+          </Typography>
+        ))}
       </Paper>
       
       {/* Step information */}

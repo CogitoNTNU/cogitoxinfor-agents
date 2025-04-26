@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+export const API_URL = 'http://localhost:8000';
 
 export const agentApi = {
   // Create and run an agent
@@ -37,5 +37,8 @@ export const agentApi = {
   
   // Get agent history information
   getAgentHistory: (agentId: string) => 
-    axios.get(`${API_URL}/agent/${agentId}/history`)
+    axios.get(`${API_URL}/agent/${agentId}/history`),
+
+  // Stream real-time logs and screenshots via Server-Sent Events
+  streamAgentEvents: (): EventSource => new EventSource(`${API_URL}/logs`),
 };

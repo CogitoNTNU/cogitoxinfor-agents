@@ -1,12 +1,29 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { agentApi } from '../services/api';
+import { agentApi, API_URL } from '../services/api';
 
 // Add LogEntry interface
 interface LogEntry {
+  id: string; // Added id property
   timestamp: string;
   level: string;
   message: string;
   source?: string;
+}
+
+// Define interface for the payload sent to runAgent
+interface AgentRunPayload {
+  testing: boolean;
+  human_intervention: boolean;
+  query: string;
+  test_actions: Array<{ action: string; args: string[] }>; // Simplified action type for now
+}
+
+// Define interface for Agent events
+export interface AgentEvent {
+  id: string;
+  type: 'ACTION_UPDATE' | 'SCREENSHOT_UPDATE' | 'INTERRUPT' | 'FINAL_ANSWER'; // Add other event types as needed
+  timestamp: Date; // Assuming timestamp is a Date object
+  payload: any; // Define a more specific type based on event type if possible
 }
 
 interface AgentContextProps {
@@ -25,12 +42,15 @@ interface AgentContextType {
   clearLogs: () => void;
   fetchLatestScreenshot: (stepNumber?: number) => Promise<string | null>;
   setCurrentAgentId: (id: string | null) => void; // Add setter for currentAgentId
-  runAgent: (task: string) => Promise<any>;      // Changed return type to any
+  runAgent: (payload: AgentRunPayload) => Promise<void>; // Updated parameter type and return type
   clearScreenshots: () => void;
   loadAgentHistory: (agentId: string) => void;
   pauseAgent: () => void;
   resumeAgent: () => void;
   stopAgent: () => void;
+  interruptMessage: string | null; // Add interruptMessage property
+  respondToInterrupt: (response: string) => void; // Add respondToInterrupt property
+  agentIds: string[]; // Added agentIds property
 }
 
 const AgentContext = createContext<AgentContextType | undefined>(undefined);
@@ -45,22 +65,33 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
   const [actionHistory, setActionHistory] = useState<any[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logEventSource, setLogEventSource] = useState<EventSource | null>(null);
+  const [interruptMessage, setInterruptMessage] = useState<string | null>(null); // Add state for interrupt message
+  const [agentIds, setAgentIds] = useState<string[]>([]); // Added state for agentIds
 
   // Clear all screenshots
   const clearScreenshots = useCallback(() => {
     setScreenshots([]);
   }, []);
+
+  // Placeholder function to respond to interrupt
+  const respondToInterrupt = useCallback((response: string) => {
+    console.log("Responding to interrupt with:", response);
+    // TODO: Implement actual logic to send response to backend
+    setInterruptMessage(null); // Clear message after responding
+  }, []);
   
   // Run an agent with the current ID and given task
-  const runAgent = useCallback(async (task: string) => {
-    if (!currentAgentId || !task.trim()) {
-      console.error("Cannot run agent: Missing agent ID or task");
+  const runAgent = useCallback(async (payload: AgentRunPayload) => { // Updated parameter type
+    if (!currentAgentId || (!payload.query.trim() && !payload.test_actions.length)) { // Updated check
+      console.error("Cannot run agent: Missing agent ID or task/test actions"); // Updated message
       return;
     }
-    
+
     try {
-      console.log(`Running agent ${currentAgentId} with task: ${task}`);
-      const response = await agentApi.runAgent(currentAgentId, task);
+      console.log(`Running agent ${currentAgentId} with payload:`, payload); // Updated log
+      const response = await agentApi.runAgent(currentAgentId, payload.query); // Use payload.query
+      // Add this agent to the list of active panels
+      setAgentIds(prev => [...prev, currentAgentId]);
       console.log("Agent run response:", response);
       setIsRunning(true);
       // Don't return the response
@@ -68,13 +99,17 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
       console.error("Error running agent:", error);
       throw error;
     }
-  }, [currentAgentId]);
+  }, [currentAgentId]); // Dependency array remains the same
   
   // Load agent history
   const loadAgentHistory = useCallback(async (agentId: string) => {
+    // Declare agentId in scope for catch block
+    const agentIdInScope = agentId; 
     try {
-      const response = await agentApi.getAgentHistory(agentId);
-      setCurrentAgentId(agentId);
+      console.log("Fetching agent history for:", agentIdInScope); // Added console log
+      const response = await agentApi.getAgentHistory(agentIdInScope);
+      console.log("Agent history response:", response.data); // Added console log
+      setCurrentAgentId(agentIdInScope);
       
       if (response.data) {
         // Set all history data
@@ -85,9 +120,9 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
           ?.filter(step => step.has_screenshot)
           .map(step => ({
             step_number: step.step_number,
-            url: step.url,
+            url: step.screenshot_url,  // Map screenshot_url to url
             title: step.title,
-            screenshot_url: step.screenshot_url,  // Use saved URL from backend
+            // Removed redundant screenshot_url property
             goal: step.goal
           })) || [];
           
@@ -103,9 +138,10 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
         setFinalAnswer(response.data.final_answer || null);
       }
     } catch (error) {
-      console.error("Error loading agent history:", error);
+      console.log("Caught error loading agent history for agentId:", agentIdInScope); // Added new console log
+      console.error("Error loading agent history for", agentIdInScope, ":", error); // Modified console log to use agentIdInScope
     }
-  }, []);
+  }, []); // Removed agentId from dependency array
   
   // Pause the agent
   const pauseAgent = useCallback(async () => {
@@ -146,6 +182,7 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
   
   // Check agent status when currentAgentId changes
   useEffect(() => {
+    console.log("Agent status effect running. currentAgentId:", currentAgentId); // Added console log
     if (!currentAgentId) {
       setIsRunning(false);
       setIsPaused(false);
@@ -154,11 +191,18 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
     
     const checkAgentStatus = async () => {
       try {
+        console.log("Checking status for agent:", currentAgentId); // Added console log
         const response = await agentApi.getAgentStatus(currentAgentId);
+        console.log("Status check response:", response.data); // Added console log
         if (response.data) {
           const { status } = response.data;
           setIsRunning(status === 'running' || status === 'paused');
           setIsPaused(status === 'paused');
+          // Call loadAgentHistory here to fetch history and screenshots
+          if (status === 'running' || status === 'paused' || status === 'stopped') {
+             console.log("Agent status is", status, "- fetching history and screenshots"); // Added console log
+             loadAgentHistory(currentAgentId);
+          }
         }
       } catch (error) {
         console.error("Error checking agent status:", error);
@@ -169,7 +213,7 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
     const intervalId = setInterval(checkAgentStatus, 5000);
     
     return () => clearInterval(intervalId);
-  }, [currentAgentId]);
+  }, [currentAgentId, loadAgentHistory]); // Added loadAgentHistory to dependency array
 
   // Clear logs
   const clearLogs = useCallback(() => {
@@ -181,54 +225,15 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
     if (!currentAgentId) return null;
     
     try {
-      const params = stepNumber !== undefined ? { step: stepNumber } : {};
+      const params = stepNumber !== undefined ? stepNumber : null;
       const response = await agentApi.getAgentScreenshot(currentAgentId, params);
-      return response.data?.screenshot || null;
+      return response.data?.url || null;
     } catch (error) {
       console.error("Error fetching screenshot:", error);
       return null;
     }
   }, [currentAgentId]);
 
-  // Connect to logs SSE endpoint when agent starts running
-  useEffect(() => {
-    if (isRunning && currentAgentId) {
-      // Close existing connection if any
-      if (logEventSource) {
-        logEventSource.close();
-      }
-      
-      // Connect to logs endpoint
-      const eventSource = new EventSource(`${agentApi.getBaseUrl()}/logs`);
-      
-      eventSource.onmessage = (event) => {
-        try {
-          const logEntry = JSON.parse(event.data);
-          setLogs(prevLogs => [...prevLogs, logEntry]);
-        } catch (error) {
-          console.error("Error parsing log data:", error);
-        }
-      };
-      
-      eventSource.onerror = () => {
-        console.error("SSE connection error");
-        eventSource.close();
-      };
-      
-      setLogEventSource(eventSource);
-      
-      return () => {
-        eventSource.close();
-        setLogEventSource(null);
-      };
-    }
-    
-    // Clean up connection when agent stops
-    if (!isRunning && logEventSource) {
-      logEventSource.close();
-      setLogEventSource(null);
-    }
-  }, [isRunning, currentAgentId]);
 
   return (
     <AgentContext.Provider
@@ -250,6 +255,9 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
         pauseAgent,
         resumeAgent,
         stopAgent,
+        interruptMessage, // Include interruptMessage in value
+        respondToInterrupt, // Include respondToInterrupt in value
+        agentIds, // Include agentIds in context value
       }}
     >
       {children}
