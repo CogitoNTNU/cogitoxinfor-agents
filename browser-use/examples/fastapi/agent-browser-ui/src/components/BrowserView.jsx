@@ -47,22 +47,34 @@ function BrowserView({ agentId }) {
     return () => clearInterval(interval);
   }, [agentId]);
 
-  // Load screenshot based on current step
+  const [screenshotUrl, setScreenshotUrl] = useState(null);
+
+  // Update the useEffect that loads screenshots
   useEffect(() => {
     if (!agentId || currentStep === null) return;
     
     const loadScreenshot = async () => {
       setIsLoading(true);
       try {
-        // If status is running and we're on the latest step, get the latest screenshot
-        const isLatestStep = currentStep === history.step_count - 1;
-        const response = await agentApi.getAgentScreenshot(
-          agentId, 
-          status === 'running' && isLatestStep ? null : currentStep
-        );
-        
-        if (response.data.screenshot) {
-          setScreenshot(response.data.screenshot);
+        // Check if we already have a URL for this step in history
+        if (history.steps && 
+            history.steps[currentStep] && 
+            history.steps[currentStep].screenshot_url) {
+          // Use the direct file URL
+          setScreenshotUrl(history.steps[currentStep].screenshot_url);
+          setScreenshot(null); // Clear base64 data
+        } else {
+          // Fall back to API method with base64 data
+          const isLatestStep = currentStep === history.step_count - 1;
+          const response = await agentApi.getAgentScreenshot(
+            agentId, 
+            status === 'running' && isLatestStep ? null : currentStep
+          );
+          
+          if (response.data.screenshot) {
+            setScreenshot(response.data.screenshot);
+            setScreenshotUrl(null);
+          }
         }
       } catch (error) {
         console.error("Error loading screenshot:", error);
@@ -73,12 +85,9 @@ function BrowserView({ agentId }) {
     
     loadScreenshot();
     
-    // If we're viewing the latest step of a running agent, refresh periodically
-    if (status === 'running' && currentStep === history.step_count - 1) {
-      const refreshInterval = setInterval(loadScreenshot, 2000);
-      return () => clearInterval(refreshInterval);
-    }
+    // Rest of the effect remains the same...
   }, [agentId, currentStep, status, history.step_count]);
+  
 
   // Handle auto-playback of history
   useEffect(() => {
@@ -187,16 +196,26 @@ function BrowserView({ agentId }) {
           />
         )}
         
-        {screenshot ? (
-          <img 
-            src={`data:image/png;base64,${screenshot}`} 
-            alt="Browser screenshot"
-            style={{ 
-              maxHeight: '100%', 
-              maxWidth: '100%', 
-              objectFit: 'contain' 
-            }}
-          />
+        {screenshotUrl ? (
+            <img 
+                src={screenshotUrl} 
+                alt="Browser screenshot"
+                style={{ 
+                maxHeight: '100%', 
+                maxWidth: '100%', 
+                objectFit: 'contain' 
+                }}
+            />
+            ) : screenshot ? (
+            <img 
+                src={`data:image/png;base64,${screenshot}`} 
+                alt="Browser screenshot"
+                style={{ 
+                maxHeight: '100%', 
+                maxWidth: '100%', 
+                objectFit: 'contain' 
+                }}
+            />
         ) : (
           <Box sx={{ textAlign: 'center' }}>
             {status === 'paused' && <Typography>Agent is paused</Typography>}

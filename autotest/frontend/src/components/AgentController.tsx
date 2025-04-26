@@ -1,223 +1,100 @@
-import React, { useState, useCallback } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-import { PlusCircle, Trash2, Play, Square, Info } from 'lucide-react'; // Lucide icons
-import { useAgent } from '@/context/AgentContext';
-import { cn } from '@/lib/utils';
-
-// Define TOOL_CONFIGURATIONS
-const TOOL_CONFIGURATIONS = {
-  NAVIGATE: {
-    args: 1,
-    validator: (args: string[]) => {
-      const url = args[0];
-      const isValid = typeof url === 'string' && url.trim().length > 0;
-      return {
-        isValid,
-        error: isValid ? '' : 'URL must be a non-empty string'
-      };
-    },
-    placeholder: 'Enter URL (e.g., https://www.google.com)'
-  },
-  CLICK: {
-    args: 1,
-    validator: (args: string[]) => {
-      const id = args[0];
-      return {
-        isValid: !isNaN(parseInt(id)),
-        error: 'Element ID must be a number'
-      };
-    },
-    placeholder: 'Enter element ID (e.g., 6)'
-  },
-  TYPE: {
-    args: 2,
-    validator: (args: string[]) => {
-      const [id, text] = args;
-      return {
-        isValid: !isNaN(parseInt(id)) && typeof text === 'string' && text.length > 0,
-        error: 'Requires element ID (number) and text to type'
-      };
-    },
-    placeholder: 'Enter element ID, text (e.g., 6, search text)'
-  },
-  WAIT: {
-    args: 1,
-    validator: (args: string[]) => {
-      const seconds = args[0];
-      return {
-        isValid: !isNaN(parseInt(seconds)) && parseInt(seconds) > 0,
-        error: 'Wait time must be a positive number'
-      };
-    },
-    placeholder: 'Enter seconds to wait (e.g., 2)'
-  },
-  SCROLL: {
-    args: 2,
-    validator: (args: string[]) => {
-      const [target, direction] = args;
-      const validDirections = ['up', 'down'];
-      const isValidTarget = target.toUpperCase() === 'WINDOW' || !isNaN(parseInt(target));
-      return {
-        isValid: isValidTarget && validDirections.includes(direction.toLowerCase()),
-        error: 'Target must be "WINDOW" or element ID, direction must be "up" or "down"'
-      };
-    },
-    placeholder: 'Enter target (WINDOW or ID), direction (up/down)'
-  }
-};
-
-// Helper function to format arguments (copied from .jsx)
-const formatArguments = (value: string, action: keyof typeof TOOL_CONFIGURATIONS, isBackspace = false): string => {
-  const config = TOOL_CONFIGURATIONS[action];
-  const values = value.split(',').map(v => v.trim()).filter(v => v !== '');
-
-  // Handle backspace logic
-  if (isBackspace) {
-    // If text contains comma without proper spacing
-    if (value.match(/,\S/)) {
-      return value.slice(0, -1);
-    }
-
-    // If ending with comma and space
-    if (value.endsWith(', ')) {
-      return value.slice(0, -2);
-    }
-
-    // If ending with just comma
-    if (value.endsWith(',')) {
-      return '';  // Clear everything when the last comma is hit
-    }
-
-    // If we have a single value (no commas)
-    if (!value.includes(',')) {
-      return value.slice(0, -1);
-    }
-
-    // If we have multiple values, handle the last one
-    const lastCommaIndex = value.lastIndexOf(',');
-    if (lastCommaIndex !== -1) {
-      const beforeComma = value.slice(0, lastCommaIndex + 2); // Keep comma and space
-      const afterComma = value.slice(lastCommaIndex + 2);
-      if (!afterComma.trim()) {
-        return value.slice(0, lastCommaIndex);
-      }
-      return beforeComma + afterComma.slice(0, -1);
-    }
-  }
-
-  return value;  // Return unmodified value for non-backspace operations
-};
-
+import React, { useState, useCallback, useEffect } from 'react';
+import { Card, CardContent } from './ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
+import { Textarea } from './ui/textarea';
+import { Button } from './ui/button';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
+import { Play, Square, Pause, PlayCircle } from 'lucide-react';
+import { useAgent } from '../context/AgentContext';
+import { agentApi } from '../services/api';
+import { v4 as uuidv4 } from 'uuid'; // You'll need to add this dependency
 
 const AgentController: React.FC = () => {
-  const { isRunning, startAgent, stopAgent } = useAgent();
+  const { isRunning, isPaused, currentAgentId, setCurrentAgentId, runAgent } = useAgent();
   const [activeTab, setActiveTab] = useState('agent');
-  const [query, setQuery] = useState('');
-  const [testActions, setTestActions] = useState<{ action: keyof typeof TOOL_CONFIGURATIONS, args: string }[]>([]);
+  const [task, setTask] = useState('');
   const [humanIntervention, setHumanIntervention] = useState(true);
-  const [errors, setErrors] = useState<{ [key: number]: string }>({});
-
-  const parseArguments = (argsString: string, action: keyof typeof TOOL_CONFIGURATIONS): string[] | null => {
-    const args = argsString.split(',').map(arg => arg.trim());
-    if (args.length !== TOOL_CONFIGURATIONS[action].args) {
-      return null;
+  const [localAgentId, setLocalAgentId] = useState('');
+  
+  // Generate a local agent ID if one doesn't exist
+  useEffect(() => {
+    if (currentAgentId) {
+      setLocalAgentId(currentAgentId);
+    } else {
+      const newAgentId = `agent-${uuidv4().substring(0, 8)}`;
+      setLocalAgentId(newAgentId);
+      // If your context provides a setter:
+      if (setCurrentAgentId) {
+        setCurrentAgentId(newAgentId);
+      }
     }
-    return args;
-  };
+  }, [currentAgentId, setCurrentAgentId]);
 
-  const validateAction = (action: keyof typeof TOOL_CONFIGURATIONS, argsString: string) => {
-    const config = TOOL_CONFIGURATIONS[action];
-    const args = parseArguments(argsString, action);
-
-    if (!args) {
-      return {
-        isValid: false,
-        error: `Expected ${config.args} argument(s)`
-      };
+  // Handle pause action
+  const handlePause = async () => {
+    if (!currentAgentId) return;
+    try {
+      await agentApi.pauseAgent(currentAgentId);
+    } catch (error) {
+      console.error("Error pausing agent:", error);
     }
-
-    return config.validator(args);
   };
-
-  const handleActionChange = useCallback((index: number, field: 'action' | 'args', value: string) => {
-    const updatedActions = [...testActions];
-    const action = field === 'action' ? value as keyof typeof TOOL_CONFIGURATIONS : updatedActions[index].action;
-    const args = field === 'args' ? value : updatedActions[index].args;
-
-    updatedActions[index] = { ...updatedActions[index], [field]: value };
-    setTestActions(updatedActions);
-
-    // Validate the updated action
-    const validation = validateAction(action, args);
-    setErrors(prev => ({
-      ...prev,
-      [index]: validation.error
-    }));
-  }, [testActions, validateAction]);
-
-  const handleStart = useCallback(() => {
-    // Prevent starting in Test Mode if no actions are defined
-    if (activeTab === 'test' && testActions.length === 0) {
+  
+  // Handle resume action
+  const handleResume = async () => {
+    if (!currentAgentId) return;
+    try {
+      await agentApi.resumeAgent(currentAgentId);
+    } catch (error) {
+      console.error("Error resuming agent:", error);
+    }
+  };
+  
+  // Handle stop action
+  const handleStop = async () => {
+    if (!currentAgentId) return;
+    try {
+      await agentApi.stopAgent(currentAgentId);
+    } catch (error) {
+      console.error("Error stopping agent:", error);
+    }
+  };
+  
+  // Modified handleRun function to use the context's runAgent method
+  const handleRun = async () => {
+    console.log("Run button clicked", { task });
+    
+    if (!task.trim()) {
+      console.log("Task is empty, not sending request");
       return;
     }
-
-    const hasErrors = activeTab === 'test'
-      ? testActions.length === 0 || testActions.some((action, index) => {
-          const validation = validateAction(action.action, action.args);
-          return !validation.isValid;
-        })
-      : false;
-
-    if (hasErrors) {
-      return; // Don't start if there are validation errors
+    
+    try {
+      // Use the context's runAgent method
+      await runAgent(task);
+      console.log("Agent run request successful");
+      setTask(''); // Clear task field after running
+    } catch (error) {
+      console.error("Error running agent:", error);
     }
-
-    const formattedActions = testActions.map(action => {
-      const args = parseArguments(action.args, action.action) || []; // Corrected argument order
-      return {
-        action: action.action,
-        args
-      };
-    });
-
-    const payload = {
-      testing: activeTab === 'test',
-      human_intervention: humanIntervention,
-      query: activeTab === 'agent' ? query : '',
-      test_actions: formattedActions
-    };
-    startAgent(payload);
-  }, [activeTab, query, testActions, humanIntervention, startAgent, validateAction, parseArguments]);
+  };
 
   return (
-    <Card className={cn("w-full")}>
-      <CardContent>
+    <Card className="w-full">
+      <CardContent className="pt-6">
         <Tabs
           value={activeTab}
           onValueChange={(value) => setActiveTab(value)}
-          className="mb-4" // Added margin bottom
+          className="mb-4"
         >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="agent">Agent Mode</TabsTrigger>
-            <TabsTrigger value="test">Test Mode</TabsTrigger>
+            <TabsTrigger value="control">Agent Controls</TabsTrigger>
           </TabsList>
+          
           <TabsContent value="agent">
-            <div className="flex items-center space-x-2 mb-4"> {/* Replaced FormControlLabel and Box */}
+            <div className="flex items-center space-x-2 mb-4">
               <Switch
                 id="human-intervention"
                 checked={humanIntervention}
@@ -226,135 +103,84 @@ const AgentController: React.FC = () => {
               <Label htmlFor="human-intervention">Human Intervention</Label>
             </div>
             <Textarea
-              placeholder="Enter your query here..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Enter your task for the agent here..."
+              value={task}
+              onChange={(e) => setTask(e.target.value)}
               rows={4}
-              className="mb-4" // Added margin bottom
+              className="mb-4"
             />
-          </TabsContent>
-          <TabsContent value="test">
-            <div className="flex items-center space-x-2 mb-4"> {/* Replaced FormControlLabel and Box */}
-              <Switch
-                id="human-intervention-test"
-                checked={humanIntervention}
-                onCheckedChange={setHumanIntervention}
-              />
-              <Label htmlFor="human-intervention-test">Human Intervention</Label>
-            </div>
+            
             <Button
-              variant="outline"
-              onClick={() => setTestActions([...testActions, { action: 'NAVIGATE', args: '' }])}
-              className="mb-4" // Added margin bottom
+              className="w-full"
+              variant={isRunning ? "destructive" : "default"}
+              onClick={isRunning ? handleStop : handleRun}
+              disabled={isRunning || !task.trim()}
             >
-              <PlusCircle className="mr-2 h-4 w-4" /> {/* Lucide icon */}
-              Add Action
+              {isRunning ? (
+                <>
+                  <Square className="mr-2 h-4 w-4" />
+                  Stop Agent
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Run Agent
+                </>
+              )}
             </Button>
-
-            <div className="space-y-2"> {/* Replaced Box */}
-              {testActions.map((action, index) => (
-                <div
-                  key={index}
-                  className="border rounded-md p-2 flex flex-col gap-2" // Replaced Paper and sx prop
+          </TabsContent>
+          
+          <TabsContent value="control">
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground mb-2">
+                Control the currently running agent:
+              </div>
+              
+              <div className="grid grid-cols-3 gap-3">
+                <Button 
+                  variant="outline"
+                  className="w-full"
+                  onClick={handlePause}
+                  disabled={!isRunning || isPaused || !currentAgentId}
                 >
-                  <div className="flex items-center gap-2"> {/* Replaced Box and sx prop */}
-                    <Select
-                      value={action.action}
-                      onValueChange={(value: keyof typeof TOOL_CONFIGURATIONS) => handleActionChange(index, 'action', value)}
-                    >
-                      <SelectTrigger className="w-[120px]"> {/* Replaced sx prop */}
-                        <SelectValue placeholder="Select Action" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.keys(TOOL_CONFIGURATIONS).map(act => (
-                          <SelectItem key={act} value={act}>{act}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex items-center flex-1"> {/* Replaced Box and sx prop */}
-                      <Input
-                        placeholder={TOOL_CONFIGURATIONS[action.action].placeholder}
-                        value={action.args}
-                        onChange={(e) => {
-                          let value = e.target.value;
-                          if (value.endsWith(' ') && !value.includes(',')) {
-                            value = value.trim() + ', ';
-                          }
-                          const formattedValue = formatArguments(value, action.action);
-                          handleActionChange(index, 'args', formattedValue);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Backspace' && action.args) {
-                            e.preventDefault();
-                            const formattedValue = formatArguments(action.args, action.action, true);
-                            handleActionChange(index, 'args', formattedValue);
-                          }
-                        }}
-                        className={cn(errors[index] && 'border-destructive')} // Added error styling
-                      />
-                      <TooltipProvider> {/* Added TooltipProvider */}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="ml-2"> {/* Replaced IconButton and sx prop */}
-                              <Info className="h-4 w-4" /> {/* Lucide icon */}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Format: {TOOL_CONFIGURATIONS[action.action].placeholder}</p>
-                            <p>Required Arguments: {TOOL_CONFIGURATIONS[action.action].args}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <Button
-                      variant="ghost" // Replaced color="error" with variant="ghost" and text-destructive
-                      size="icon"
-                      onClick={() => {
-                        const newActions = testActions.filter((_, i) => i !== index);
-                        setTestActions(newActions);
-                        const newErrors = {...errors};
-                        delete newErrors[index];
-                        setErrors(newErrors);
-                      }}
-                      className="text-destructive" // Added text-destructive class
-                    >
-                      <Trash2 className="h-4 w-4" /> {/* Lucide icon */}
-                    </Button>
-                  </div>
-                  {errors[index] && (
-                    <p className="text-destructive text-sm mt-1">{errors[index]}</p> // Added error message display
-                  )}
+                  <Pause className="mr-2 h-4 w-4" />
+                  Pause
+                </Button>
+                
+                <Button 
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleResume}
+                  disabled={!isPaused || !currentAgentId}
+                >
+                  <PlayCircle className="mr-2 h-4 w-4" />
+                  Resume
+                </Button>
+                
+                <Button 
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleStop}
+                  disabled={(!isRunning && !isPaused) || !currentAgentId}
+                  color="destructive"
+                >
+                  <Square className="mr-2 h-4 w-4" />
+                  Stop
+                </Button>
+              </div>
+              
+              {currentAgentId ? (
+                <div className="text-xs text-center mt-2">
+                  Current Agent ID: <code>{currentAgentId}</code>
                 </div>
-              ))}
+              ) : (
+                <div className="text-xs text-center mt-2 text-muted-foreground">
+                  No agent currently running
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
-
-
-        <Button
-          className="w-full" // Replaced fullWidth with w-full
-          variant={isRunning ? "destructive" : "default"} // Replaced color prop with variant
-          onClick={isRunning ? stopAgent : handleStart}
-          disabled={
-            (activeTab === 'agent' && !query.trim()) ||
-            (activeTab === 'test' && (
-              testActions.length === 0 ||
-              Object.values(errors).some(errorMsg => errorMsg.length > 0)
-            ))
-          }
-        >
-          {isRunning ? (
-            <>
-              <Square className="mr-2 h-4 w-4" /> {/* Lucide icon */}
-              Stop Agent
-            </>
-          ) : (
-            <>
-              <Play className="mr-2 h-4 w-4" /> {/* Lucide icon */}
-              Start Agent
-            </>
-          )}
-        </Button>
       </CardContent>
     </Card>
   );

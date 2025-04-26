@@ -77,9 +77,15 @@ app.add_middleware(
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 os.makedirs(STATIC_DIR, exist_ok=True)
 
-# Serve static files
-app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
 
+# Mount the screenshots directory to serve image files directly
+# Define and create screenshots directory
+SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'screenshots')
+os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+
+# Mount static directories
+app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
+app.mount('/screenshots', StaticFiles(directory=SCREENSHOTS_DIR), name='screenshots')
 
 class TaskRequest(BaseModel):
 	agent_id: str
@@ -165,10 +171,45 @@ class AgentManager:
 			agent_id: {'task': data['task'], 'status': self.get_agent_status(agent_id)} for agent_id, data in self.agents.items()
 		}
 
+	def save_agent_screenshot(self, agent_id: str, screenshot_data: str, step_number: int = None) -> str:
+		"""Save a screenshot to disk and return the URL path"""
+		# Create agent-specific directory
+		agent_dir = Path(SCREENSHOTS_DIR) / agent_id
+		agent_dir.mkdir(exist_ok=True)
+		
+		# Generate filename
+		timestamp = time.strftime("%Y%m%d-%H%M%S")
+		step_info = f"_step{step_number}" if step_number is not None else ""
+		filename = f"{timestamp}{step_info}.png"
+		filepath = agent_dir / filename
+		
+		if b64_to_png(screenshot_data, filepath):
+			# Return the URL path that can be used by the frontend
+			return f"/screenshots/{agent_id}/{filename}"
+		return None
 
 # Create a singleton instance
 agent_manager = AgentManager()
 
+# Add near the top of the file with other directory creation
+import base64
+from pathlib import Path
+
+# Create screenshots directory if it doesn't exist
+SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'screenshots')
+os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+
+def b64_to_png(base64_str: str, output_path: Path) -> bool:
+    """Convert base64 string to PNG file"""
+    try:
+        img_data = base64.b64decode(base64_str)
+        with open(output_path, 'wb') as f:
+            f.write(img_data)
+        logger.info(f"Saved screenshot to {output_path}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save screenshot: {str(e)}")
+        return False
 
 @app.get('/')
 async def read_root():
@@ -263,7 +304,7 @@ async def list_agents():
 	return agent_manager.list_agents()
 
 @app.get('/agent/{agent_id}/screenshot')
-async def get_agent_screenshot(agent_id: str, step: Optional[int] = None):
+async def get_agent_screenshot(agent_id: str, step: Optional[int] = None, save: bool = True):
     """Get the latest screenshot or a specific step's screenshot"""
     try:
         agent = agent_manager.get_agent(agent_id)
@@ -273,18 +314,26 @@ async def get_agent_screenshot(agent_id: str, step: Optional[int] = None):
             # If step is provided, get that specific step's screenshot
             if step is not None and 0 <= step < len(agent.history.history):
                 screenshot_data = agent.history.history[step].state.screenshot
+                step_num = step
             else:
                 # Otherwise return the latest screenshot
                 screenshot_data = agent.history.history[-1].state.screenshot
+                step_num = len(agent.history.history) - 1
+                
+            if screenshot_data and save:
+                agent_manager.save_agent_screenshot(agent_id, screenshot_data, step_num)
                 
             if screenshot_data:
-                # Return the base64 data directly for embedding in an <img> tag
-                return {"screenshot": screenshot_data, "step": step or len(agent.history.history) - 1}
+                return {"screenshot": screenshot_data, "step": step_num}
         
         # If we can't get a screenshot from history, try to take a new one
-        current_state = await agent.browser_context.get_state()  # Removed use_vision parameter
+        # FIXED: Removed the use_vision parameter
+        current_state = await agent.browser_context.get_state()
         if current_state and current_state.screenshot:
-            return {"screenshot": current_state.screenshot, "step": -1}
+            screenshot_data = current_state.screenshot
+            if save:
+                agent_manager.save_agent_screenshot(agent_id, screenshot_data)
+            return {"screenshot": screenshot_data, "step": -1}
             
         raise HTTPException(status_code=404, detail="No screenshot available")
     except Exception as e:
@@ -293,7 +342,7 @@ async def get_agent_screenshot(agent_id: str, step: Optional[int] = None):
 
             
 @app.get('/agent/{agent_id}/history')
-async def get_agent_history(agent_id: str):
+async def get_agent_history(agent_id: str, save_screenshots: bool = True):
     """Get agent history information including screenshot count"""
     try:
         agent = agent_manager.get_agent(agent_id)
@@ -308,9 +357,15 @@ async def get_agent_history(agent_id: str):
             for i, step in enumerate(agent.history.history):
                 goal = step.model_output.current_state.next_goal if step.model_output else "No goal available"
                 
+                # Save screenshot if available and requested
+                screenshot_url = None
+                if save_screenshots and step.state.screenshot:
+                    screenshot_url = agent_manager.save_agent_screenshot(agent_id, step.state.screenshot, i)
+                
                 step_info = {
                     "step_number": i,
                     "has_screenshot": step.state.screenshot is not None,
+                    "screenshot_url": screenshot_url,  # Add URL to the response
                     "url": step.state.url,
                     "title": step.state.title,
                     "goal": goal
@@ -323,7 +378,6 @@ async def get_agent_history(agent_id: str):
     except Exception as e:
         logger.error(f"Error getting history for {agent_id}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-
 
 @app.get('/logs')
 async def event_stream():
