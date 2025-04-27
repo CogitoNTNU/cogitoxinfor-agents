@@ -1,0 +1,49 @@
+{
+  "website_html": "See html_content/2.html",
+  "website_screenshot": "See screenshots/2.png",
+  "url": "about:blank",
+  "model_thoughts": {
+    "evaluation_previous_goal": "Unknown - There's no prior context about previous actions taken. Starting with a blank page.",
+    "memory": "Start at an empty page. 0 out of 2 prices for GPT-4o and DeepSeek-V3 researched.",
+    "next_goal": "Search for the price of GPT-4o on Google."
+  },
+  "model_outputs": {
+    "current_state": {
+      "evaluation_previous_goal": "Unknown - There's no prior context about previous actions taken. Starting with a blank page.",
+      "memory": "Start at an empty page. 0 out of 2 prices for GPT-4o and DeepSeek-V3 researched.",
+      "next_goal": "Search for the price of GPT-4o on Google."
+    },
+    "action": [
+      {
+        "done": null,
+        "search_google": {
+          "query": "GPT-4o pricing"
+        },
+        "go_to_url": null,
+        "go_back": null,
+        "wait": null,
+        "click_element_by_index": null,
+        "input_text": null,
+        "save_pdf": null,
+        "switch_tab": null,
+        "open_tab": null,
+        "close_tab": null,
+        "extract_content": null,
+        "scroll_down": null,
+        "scroll_up": null,
+        "send_keys": null,
+        "scroll_to_text": null,
+        "get_dropdown_options": null,
+        "select_dropdown_option": null,
+        "drag_drop": null
+      }
+    ]
+  },
+  "model_actions": {
+    "search_google": {
+      "query": "GPT-4o pricing"
+    },
+    "interacted_element": null
+  },
+  "extracted_content": "\ud83d\udd0d  Searched for \"GPT-4o pricing\" in Google"
+}

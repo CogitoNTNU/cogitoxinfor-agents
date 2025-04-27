@@ -21,9 +21,11 @@ from sse_starlette.sse import EventSourceResponse
 
 from browser_use import Agent
 
-# Create logs directory if it doesn't exist
+# Create logs and recordings directories if they don't exist
 LOGS_DIR = os.path.join(os.path.dirname(__file__), 'logs')
+RECORDINGS_DIR = os.path.join(os.path.dirname(__file__), 'recordings')
 os.makedirs(LOGS_DIR, exist_ok=True)
+os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
