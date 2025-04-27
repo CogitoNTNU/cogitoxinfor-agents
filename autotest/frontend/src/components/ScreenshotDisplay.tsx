@@ -47,28 +47,9 @@ export const ScreenshotDisplay: React.FC<ScreenshotDisplayProps> = ({
     }
   }, [api, screenshots]);
 
-
-  // Function to format the timestamp (might not be needed if timestamp is not in data)
-  // const formatTimestamp = (timestamp: number) => {
-  //   return format(new Date(timestamp), 'HH:mm:ss');
-  // };
-
   return (
     <>
-      <Card className={cn("w-full", className)}>
-        <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-          {screenshots.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onClearScreenshots}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear Screenshots
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="p-4 flex flex-col h-full">
+      <Card className={cn("w-full border-none", className)}>
           {screenshots.length === 0 && loading ? ( // Use loading prop
               <div className="flex items-center justify-center flex-1 border border-dashed rounded-md">
                 <p className="text-muted-foreground">Agent Running...</p> {/* Or a loading indicator */}
@@ -118,7 +99,6 @@ export const ScreenshotDisplay: React.FC<ScreenshotDisplayProps> = ({
               </Carousel>
             </div>
           )}
-        </CardContent>
       </Card>
 
       {/* Modal for expanded screenshot view */}
