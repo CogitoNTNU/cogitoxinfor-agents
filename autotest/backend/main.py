@@ -137,7 +137,6 @@ class AgentManager:
 				agent_instance = Agent(
 					task=task,
 					llm=llm,
-					save_conversation_path="logs/conversation.json",
 					register_new_step_callback=make_step_logger(agent_id)
 				)
 				agent = {
