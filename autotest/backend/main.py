@@ -68,6 +68,7 @@ class LogHandler(logging.Handler):
 
 # Add handlers to the browser_use logger
 browser_use_logger = logging.getLogger('browser_use')
+browser_use_logger.setLevel(logging.INFO)
 browser_use_logger.addHandler(LogHandler())
 browser_use_logger.addHandler(agent_file_handler)
 
