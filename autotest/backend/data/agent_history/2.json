@@ -1,0 +1,49 @@
+{
+  "website_html": null,
+  "website_screenshot": null,
+  "url": "about:blank",
+  "model_thoughts": {
+    "evaluation_previous_goal": "Unknown - Currently, the browser is empty with no available actions to take.",
+    "memory": "0 out of 1 searches completed. The current step is 1. Waiting to perform the search task.",
+    "next_goal": "Search for 'python' on Google."
+  },
+  "model_outputs": {
+    "current_state": {
+      "evaluation_previous_goal": "Unknown - Currently, the browser is empty with no available actions to take.",
+      "memory": "0 out of 1 searches completed. The current step is 1. Waiting to perform the search task.",
+      "next_goal": "Search for 'python' on Google."
+    },
+    "action": [
+      {
+        "done": null,
+        "search_google": {
+          "query": "python"
+        },
+        "go_to_url": null,
+        "go_back": null,
+        "wait": null,
+        "click_element_by_index": null,
+        "input_text": null,
+        "save_pdf": null,
+        "switch_tab": null,
+        "open_tab": null,
+        "close_tab": null,
+        "extract_content": null,
+        "scroll_down": null,
+        "scroll_up": null,
+        "send_keys": null,
+        "scroll_to_text": null,
+        "get_dropdown_options": null,
+        "select_dropdown_option": null,
+        "drag_drop": null
+      }
+    ]
+  },
+  "model_actions": {
+    "search_google": {
+      "query": "python"
+    },
+    "interacted_element": null
+  },
+  "extracted_content": "\ud83d\udd0d  Searched for \"python\" in Google"
+}

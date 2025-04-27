@@ -18,7 +18,14 @@ from fastapi.staticfiles import StaticFiles
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+#!/usr/bin/env python3
 
+import requests
+from dotenv import load_dotenv
+from pyobjtojson import obj_to_json
+
+# Load environment variables (for API keys)
+load_dotenv()
 from browser_use import Agent
 
 # Create logs and recordings directories if they don't exist
@@ -341,6 +348,95 @@ def make_action_logger(agent_id: str):
                 f.write(json.dumps(record) + '\n')
     return action_logger
 
+def send_agent_history_step(data):
+    """Send the agent step data to the recording API"""
+    url = "http://127.0.0.1:9000/post_agent_history_step"
+    response = requests.post(url, json=data)
+    return response.json()
+
+
+async def record_activity_before(agent_obj):
+    """Hook function that captures and records agent activity at each step"""
+    website_html = None
+    website_screenshot = None
+    urls_json_last_elem = None
+    model_thoughts_last_elem = None
+    model_outputs_json_last_elem = None
+    model_actions_json_last_elem = None
+    extracted_content_json_last_elem = None
+
+    print('--- ON_STEP_START HOOK ---')
+    
+    # Capture current page state
+    #website_html = await agent_obj.browser_context.get_page_html()
+    #website_screenshot = await agent_obj.browser_context.take_screenshot()
+
+    # Make sure we have state history
+    if hasattr(agent_obj, "state"):
+        history = agent_obj.state.history
+    else:
+        history = None
+        print("Warning: Agent has no state history")
+        return
+
+    # Process model thoughts
+    model_thoughts = obj_to_json(
+        obj=history.model_thoughts(),
+    )
+    if len(model_thoughts) > 0:
+        model_thoughts_last_elem = model_thoughts[-1]
+
+    # Process model outputs
+    model_outputs = agent_obj.state.history.model_outputs()
+    model_outputs_json = obj_to_json(
+        obj=model_outputs,
+    )
+    if len(model_outputs_json) > 0:
+        model_outputs_json_last_elem = model_outputs_json[-1]
+
+    # Process model actions
+    model_actions = agent_obj.state.history.model_actions()
+    model_actions_json = obj_to_json(
+        obj=model_actions,
+    )
+    if len(model_actions_json) > 0:
+        model_actions_json_last_elem = model_actions_json[-1]
+
+    # Process extracted content
+    extracted_content = agent_obj.state.history.extracted_content()
+    extracted_content_json = obj_to_json(
+        obj=extracted_content,
+    )
+    if len(extracted_content_json) > 0:
+        extracted_content_json_last_elem = extracted_content_json[-1]
+
+    # Process URLs
+    urls = agent_obj.state.history.urls()
+    urls_json = obj_to_json(
+        obj=urls,
+    )
+    if len(urls_json) > 0:
+        urls_json_last_elem = urls_json[-1]
+
+    # Create a summary of all data for this step
+    model_step_summary = {
+        "website_html": website_html,
+        "website_screenshot": website_screenshot,
+        "url": urls_json_last_elem,
+        "model_thoughts": model_thoughts_last_elem,
+        "model_outputs": model_outputs_json_last_elem,
+        "model_actions": model_actions_json_last_elem,
+        "extracted_content": extracted_content_json_last_elem
+    }
+
+    print("--- MODEL STEP SUMMARY ---")
+    print(f"URL: {urls_json_last_elem}")
+    
+    # Send data to the API
+    result = send_agent_history_step(data=model_step_summary)
+    print(f"Recording API response: {result}")
+
+
 @app.get('/')
 async def read_root():
 	return FileResponse(os.path.join(STATIC_DIR, 'index.html'))
@@ -369,8 +465,10 @@ async def run_agent(agent_id: str, request: RunRequest):
 
         # Kick off the browser‐automation in the background
         task = asyncio.create_task(
-            agent.run(on_step_end=make_action_logger(agent_id))
-        )
+            agent.run(
+                on_step_end=make_action_logger(agent_id),
+                on_step_start=record_activity_before,
+                ))
 
         # Add completion callback for debugging
         def done_callback(future):
@@ -450,8 +548,6 @@ async def get_agent_status(agent_id: str):
 		return {'status': status, 'agent_id': agent_id, 'task': task}
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
-
-
 
 @app.get('/agents')
 async def list_agents():
@@ -621,6 +717,23 @@ async def get_system_stats():
 
 
 if __name__ == '__main__':
-	import uvicorn
+    import subprocess
+    import sys
+    import time
 
-	uvicorn.run(app, host='0.0.0.0', port=8000)
+#    # Start api.py as a subprocess
+#    api_proc = subprocess.Popen(
+#        [sys.executable, "api.py"],
+#        cwd=os.path.dirname(__file__)
+#    )
+#    print("Started api.py subprocess")
+#
+#    # Optional: Wait a bit to ensure api.py is up before starting main FastAPI
+#    time.sleep(1)
+
+    import uvicorn
+    #try:
+    uvicorn.run(app, host='0.0.0.0', port=8000)
+    #finally:
+        # Terminate api.py when main.py exits
+        #api_proc.terminate()

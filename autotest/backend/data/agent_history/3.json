@@ -1,0 +1,15 @@
+{
+  "website_html": null,
+  "website_screenshot": null,
+  "url": "https://www.google.com/search?q=python&udm=14&sei=2EUOaPDEHNvPxc8PmebC0As",
+  "model_thoughts": "<circular reference>",
+  "model_outputs": "<circular reference>",
+  "model_actions": {
+    "extract_content": {
+      "goal": "Extract the top three results from the Google search for 'python'.",
+      "should_strip_link_urls": false
+    },
+    "interacted_element": null
+  },
+  "extracted_content": "\ud83d\udcc4  Extracted from page\n: ```json\n{\n  \"results\": [\n    {\n      \"title\": \"Welcome to Python.org\",\n      \"url\": \"https://www.python.org\",\n      \"description\": \"Python is a programming language that lets you work quickly and integrate systems more effectively.\"\n    },\n    {\n      \"title\": \"Python (programming language)\",\n      \"url\": \"https://en.wikipedia.org/wiki/Python_(programming_language)\",\n      \"description\": \"Python is a high-level, general-purpose programming language. Its design philosophy emphasizes code readability with the use of significant indentation.\"\n    },\n    {\n      \"title\": \"Python Tutorial\",\n      \"url\": \"https://www.w3schools.com/python/\",\n      \"description\": \"Learn Python. Python is a popular programming language. Python can be used on a server to create web applications. Start learning Python now.\"\n    }\n  ]\n}\n```\n"
+}
