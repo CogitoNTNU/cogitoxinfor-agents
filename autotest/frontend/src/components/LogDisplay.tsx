@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // Import useState, useEffect, and useRef
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -32,6 +32,18 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
 }) => {
   // Removed useAgent hook usage
   const [activeTab, setActiveTab] = useState('logs');
+  const scrollAreaRef = useRef<HTMLDivElement>(null); // Ref for the scrollable area
+
+  // Auto-scroll the log view to the bottom on new logs
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      // If the ScrollArea wraps a viewport element, target that
+      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+      const scrollEl = viewport || scrollAreaRef.current;
+      // Scroll to bottom
+      scrollEl.scrollTop = scrollEl.scrollHeight;
+    }
+  }, [logs]);
 
   // Function to format the timestamp
   const formatTimestamp = (timestamp: string) => {
@@ -59,11 +71,11 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
           </Button>
         )}
       </CardHeader>
-      
+
       <CardContent className="p-4">
-          
+
           {/* Regular logs tab content */}
-            <ScrollArea className="h-[300px] pr-4">
+            <ScrollArea className="h-[300px] pr-4" ref={scrollAreaRef}> {/* Attach ref to ScrollArea */}
               {logs.length === 0 && isRunning ? (
                  actionHistory && actionHistory.length > 0 ? ( // Keep actionHistory display if it's passed as a prop
                   <div className="space-y-2">

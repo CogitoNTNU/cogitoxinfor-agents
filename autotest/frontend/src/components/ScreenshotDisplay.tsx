@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Import useState and useEffect from react
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import {
@@ -7,7 +7,7 @@ import {
   CarouselItem,
   CarouselPrevious,
   CarouselNext,
-} from './ui/carousel';
+} from './ui/carousel'; // Remove useCarousel import here
 import { Trash2, Maximize2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -36,6 +36,17 @@ export const ScreenshotDisplay: React.FC<ScreenshotDisplayProps> = ({
 }) => {
   // Removed useAgent hook usage
   const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
+  const [api, setApi] = useState<any>(); // State to hold the carousel API
+
+  useEffect(() => {
+    if (api && screenshots.length > 0) {
+      // Ensure carousel re-initializes when new items arrive
+      api.reInit();
+      // Scroll to the newest screenshot
+      api.scrollTo(screenshots.length - 1);
+    }
+  }, [api, screenshots]);
+
 
   // Function to format the timestamp (might not be needed if timestamp is not in data)
   // const formatTimestamp = (timestamp: number) => {
@@ -68,7 +79,7 @@ export const ScreenshotDisplay: React.FC<ScreenshotDisplayProps> = ({
             </div>
           ) : (
             <div className="relative flex-1 overflow-visible">
-              <Carousel className="h-full w-full">
+              <Carousel className="h-full w-full" setApi={setApi}> {/* Pass setApi to Carousel */}
                 <CarouselPrevious
                   className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/50 hover:bg-background z-10"
                 />

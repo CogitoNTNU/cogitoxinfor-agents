@@ -302,12 +302,13 @@ def make_step_logger(agent_id: str):
             with open(path, 'wb') as f:
                 f.write(img)
             # Also enqueue screenshot for live streaming
-            with screenshot_lock:
-                screenshot_queue.put({
-                    "agent_id": agent_id,
-                    "step": step_number,
-                    "data": state.screenshot
-                })
+            if state.screenshot: # Ensure screenshot data exists
+                with screenshot_lock:
+                    screenshot_queue.put({
+                        "agent_id": agent_id,
+                        "step": step_number,
+                        "data": state.screenshot # Send raw screenshot data as received
+                    })
     return step_logger
 
 # --- Action logger for browser actions as JSON ---

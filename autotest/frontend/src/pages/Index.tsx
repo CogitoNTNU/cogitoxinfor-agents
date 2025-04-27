@@ -44,10 +44,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ agentId }) => {
         <h3 className="font-bold mb-2">Screenshots</h3>
         <div className="flex-1 overflow-visible">
           <ScreenshotDisplay
-            screenshots={screenshots.map((data, idx) => ({
-              id: `${agentId}-${idx}`,
-              url: `data:image/png;base64,${data}`,
-            }))}
+            screenshots={screenshots} // Pass screenshots directly
             onClearScreenshots={() => {}}
             loading={isRunning && screenshots.length === 0}
           />

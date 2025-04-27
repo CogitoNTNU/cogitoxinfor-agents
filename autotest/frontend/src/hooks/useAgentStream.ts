@@ -61,15 +61,26 @@ export function useAgentStream(agentId: string | null) {
       try {
         entry = JSON.parse(e.data);
       } catch {
-        return;
+        // If parsing fails, assume the data itself is the base64 string
+        entry = { data: e.data };
       }
       if (entry.agent_id && entry.agent_id !== agentId) return;
-      const raw = entry.data;
-      const dataUrl = typeof raw === 'string' && raw.startsWith('data:')
-        ? raw
-        : `data:image/png;base64,${raw}`;
+      
+      // Access the screenshot data directly from entry.data
+      const rawScreenshotData = entry.data; 
+      
+      if (typeof rawScreenshotData !== 'string') {
+        console.error('Received non-string screenshot data:', rawScreenshotData);
+        return; // Skip if data is not a string
+      }
+      
+      const dataUrl = rawScreenshotData.startsWith('data:')
+        ? rawScreenshotData
+        : `data:image/png;base64,${rawScreenshotData}`;
+        
       const step = entry.step ?? Date.now();
       const uniqueId = `${agentId}-${step}-${Date.now()}`;
+      
       setScreenshots(prev => [
         ...prev,
         { id: uniqueId, url: dataUrl },
@@ -81,7 +92,7 @@ export function useAgentStream(agentId: string | null) {
       es.close();
       setIsRunning(false);
     };
-  }, [agentId, historyScreenshots]);
+  }, [agentId]); // Dependency array remains [agentId]
 
   return { logs, screenshots, isRunning };
 }
