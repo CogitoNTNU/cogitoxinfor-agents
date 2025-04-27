@@ -8,9 +8,11 @@ from threading import Lock
 from typing import Any, Dict, Optional
 import json
 from datetime import datetime, timezone
+from pathlib import Path
+from pyobjtojson import obj_to_json  # Add this import
 
 import psutil
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,9 +22,11 @@ from sse_starlette.sse import EventSourceResponse
 
 from browser_use import Agent
 
-# Create logs directory if it doesn't exist
+# Create logs and recordings directories if they don't exist
 LOGS_DIR = os.path.join(os.path.dirname(__file__), 'logs')
+RECORDINGS_DIR = os.path.join(os.path.dirname(__file__), 'recordings')
 os.makedirs(LOGS_DIR, exist_ok=True)
+os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -342,6 +346,130 @@ async def read_root():
 	return FileResponse(os.path.join(STATIC_DIR, 'index.html'))
 
 
+# Add this function near other agent-related functions
+async def record_activity(agent):
+    """Record detailed agent activity at each step"""
+    try:
+        website_html = None
+        website_screenshot = None
+        url = None
+        model_thoughts = None
+        model_outputs = None
+        model_actions = None
+        extracted_content = None
+        
+        # Capture current page state
+        try:
+            website_html = await agent.browser_context.get_page_html()
+            website_screenshot = await agent.browser_context.take_screenshot()
+        except Exception as e:
+            logger.error(f"Error capturing page state: {str(e)}")
+        
+        # Make sure we have state history
+        if hasattr(agent, "state") and hasattr(agent.state, "history"):
+            history = agent.state.history
+            
+            # Process URLs
+            if hasattr(history, "urls") and callable(history.urls):
+                urls = history.urls()
+                if urls:
+                    url = urls[-1]
+            
+            # Process model thoughts
+            if hasattr(history, "model_thoughts") and callable(history.model_thoughts):
+                thoughts = history.model_thoughts()
+                if thoughts:
+                    model_thoughts = obj_to_json(thoughts[-1], check_circular=False)
+            
+            # Process model outputs
+            if hasattr(history, "model_outputs") and callable(history.model_outputs):
+                outputs = history.model_outputs()
+                if outputs:
+                    model_outputs = obj_to_json(outputs[-1], check_circular=False)
+            
+            # Process model actions
+            if hasattr(history, "model_actions") and callable(history.model_actions):
+                actions = history.model_actions()
+                if actions:
+                    model_actions = obj_to_json(actions[-1], check_circular=False)
+            
+            # Process extracted content
+            if hasattr(history, "extracted_content") and callable(history.extracted_content):
+                content = history.extracted_content()
+                if content:
+                    extracted_content = obj_to_json(content[-1], check_circular=False)
+        
+        # Create a summary of all data for this step
+        timestamp = datetime.now(timezone.utc).isoformat()
+        model_step_summary = {
+            "timestamp": timestamp,
+            "website_html": website_html,
+            "website_screenshot": website_screenshot,
+            "url": url,
+            "model_thoughts": model_thoughts,
+            "model_outputs": model_outputs,
+            "model_actions": model_actions,
+            "extracted_content": extracted_content
+        }
+        
+        # Send data to our own API endpoint
+        import requests
+        try:
+            response = requests.post(
+                "http://localhost:8000/post_agent_history_step", 
+                json=model_step_summary
+            )
+            logger.info(f"Recording API response: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Error sending step data to API: {str(e)}")
+            
+    except Exception as e:
+        logger.error(f"Error in record_activity: {str(e)}")
+
+# Add near other API endpoints
+@app.post("/post_agent_history_step")
+async def post_agent_history_step(request: Request):
+    data = await request.json()
+    logger.info(f"Received agent history step data")
+    
+    # Ensure the recordings folder exists
+    recordings_folder = Path(RECORDINGS_DIR)
+    recordings_folder.mkdir(exist_ok=True)
+    
+    # Determine the next file number
+    existing_numbers = []
+    for item in recordings_folder.iterdir():
+        if item.is_file() and item.suffix == ".json":
+            try:
+                file_num = int(item.stem)
+                existing_numbers.append(file_num)
+            except ValueError:
+                pass
+    
+    next_number = max(existing_numbers) + 1 if existing_numbers else 1
+    
+    # Construct the file path
+    file_path = recordings_folder / f"{next_number}.json"
+    
+    # Save the JSON data to the file
+    with file_path.open("w") as f:
+        json.dump(data, f, indent=2)
+    
+    # If there's a screenshot in the data, save it separately
+    if "website_screenshot" in data and data["website_screenshot"]:
+        screenshot_folder = Path(SCREENSHOTS_DIR)
+        screenshot_folder.mkdir(exist_ok=True)
+        
+        try:
+            b64_to_png(data["website_screenshot"], 
+                       screenshot_folder / f"recording_{next_number}.png")
+        except Exception as e:
+            logger.error(f"Failed to save screenshot: {str(e)}")
+    
+    return {"status": "ok", "message": f"Saved to {file_path}"}
+
+
+# Modify the run_agent endpoint
 @app.post('/agent/run')
 async def run_agent(request: TaskRequest):
     try:
@@ -352,16 +480,19 @@ async def run_agent(request: TaskRequest):
         agent = agent_manager.get_agent(request.agent_id)
         agent_manager.set_running(request.agent_id, True)
 
-        # Run in background task to not block, and log browser actions as JSON
+        # Run in background task to not block, and log browser actions
         task = asyncio.create_task(
-            agent.run(on_step_end=make_action_logger(request.agent_id))
+            agent.run(
+                on_step_end=make_action_logger(request.agent_id),
+                on_step_start=record_activity  # Add this line
+            )
         )
 
         # Add completion callback for debugging
         def done_callback(future):
             try:
                 result = future.result()
-                # Save history after agent completes (this saves more than just actions)
+                # Save history after agent completes
                 agent_manager.save_agent_history(request.agent_id, request.task)
             except Exception as e:
                 logger.error(f'Agent {request.agent_id} failed: {str(e)}')

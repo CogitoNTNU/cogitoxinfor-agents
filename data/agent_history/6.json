@@ -1,0 +1,14 @@
+{
+  "website_html": "See html_content/6.html",
+  "website_screenshot": "See screenshots/6.png",
+  "url": "https://www.google.com/search?q=GPT-4o%20pricing&udm=14&sei=huoNaI76BrrIwPAP6YWuwAk",
+  "model_thoughts": "<circular reference>",
+  "model_outputs": "<circular reference>",
+  "model_actions": {
+    "search_google": {
+      "query": "DeepSeek-V3 pricing"
+    },
+    "interacted_element": null
+  },
+  "extracted_content": "\ud83d\udd0d  Searched for \"DeepSeek-V3 pricing\" in Google"
+}

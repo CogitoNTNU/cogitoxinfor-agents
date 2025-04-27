@@ -1,0 +1,20 @@
+Requirement already satisfied: pydantic in /home/teodorrk/projects/cogitoxinfor-agents/.myvenv/lib/python3.11/site-packages (1.10.22)
+Collecting pydantic
+  Using cached pydantic-2.11.3-py3-none-any.whl.metadata (65 kB)
+Requirement already satisfied: annotated-types>=0.6.0 in /home/teodorrk/projects/cogitoxinfor-agents/.myvenv/lib/python3.11/site-packages (from pydantic) (0.7.0)
+Collecting pydantic-core==2.33.1 (from pydantic)
+  Using cached pydantic_core-2.33.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.8 kB)
+Requirement already satisfied: typing-extensions>=4.12.2 in /home/teodorrk/projects/cogitoxinfor-agents/.myvenv/lib/python3.11/site-packages (from pydantic) (4.12.2)
+Requirement already satisfied: typing-inspection>=0.4.0 in /home/teodorrk/projects/cogitoxinfor-agents/.myvenv/lib/python3.11/site-packages (from pydantic) (0.4.0)
+Using cached pydantic-2.11.3-py3-none-any.whl (443 kB)
+Using cached pydantic_core-2.33.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.0 MB)
+Installing collected packages: pydantic-core, pydantic
+  Attempting uninstall: pydantic-core
+    Found existing installation: pydantic_core 2.27.2
+    Uninstalling pydantic_core-2.27.2:
+      Successfully uninstalled pydantic_core-2.27.2
+  Attempting uninstall: pydantic
+    Found existing installation: pydantic 1.10.22
+    Uninstalling pydantic-1.10.22:
+      Successfully uninstalled pydantic-1.10.22
+Successfully installed pydantic-2.11.3 pydantic-core-2.33.1

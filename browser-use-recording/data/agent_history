@@ -1,0 +1,5 @@
+The file /browser-use-recording/browser-use-recording/data/agent_history is intended to store the recorded agent history data. Since you want to create this directory to store JSON files, it should be empty for now, as the actual data will be written to it by the application during runtime. 
+
+Here are the contents for the file:
+
+# This directory is intended to store the recorded agent history data.
