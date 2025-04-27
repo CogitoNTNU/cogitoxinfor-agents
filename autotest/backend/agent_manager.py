@@ -59,7 +59,7 @@ class AgentManager:
 				raise ValueError(f'Agent {agent_id} already exists')
 
 			try:
-				llm = ChatOpenAI(model='gpt-4o-mini')
+				llm = ChatOpenAI(model='gpt-4.1-nano')
 				agent_instance = Agent(
 					task=task,
 					llm=llm,

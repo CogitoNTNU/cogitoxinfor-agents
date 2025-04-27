@@ -1,0 +1,53 @@
+{
+  "agent_id": "f55b2b40-cf7c-421d-b9a5-517f7ded3761",
+  "event_type": "pre_step",
+  "timestamp": "2025-04-27T17:12:36.094980+00:00",
+  "step_number": 1,
+  "website_html": null,
+  "website_screenshot": null,
+  "url": "about:blank",
+  "model_thoughts": {
+    "evaluation_previous_goal": "Failed - The current page is blank, no elements or content available to perform a search for 'python' on Google.",
+    "memory": "The current page is blank with no interactive elements. The task is to go to Google and search for 'python'. I need to navigate to Google first.",
+    "next_goal": "Navigate to https://www.google.com and then perform a search for 'python'."
+  },
+  "model_outputs": {
+    "current_state": {
+      "evaluation_previous_goal": "Failed - The current page is blank, no elements or content available to perform a search for 'python' on Google.",
+      "memory": "The current page is blank with no interactive elements. The task is to go to Google and search for 'python'. I need to navigate to Google first.",
+      "next_goal": "Navigate to https://www.google.com and then perform a search for 'python'."
+    },
+    "action": [
+      {
+        "done": null,
+        "search_google": null,
+        "go_to_url": {
+          "url": "https://www.google.com"
+        },
+        "go_back": null,
+        "wait": null,
+        "click_element_by_index": null,
+        "input_text": null,
+        "save_pdf": null,
+        "switch_tab": null,
+        "open_tab": null,
+        "close_tab": null,
+        "extract_content": null,
+        "scroll_down": null,
+        "scroll_up": null,
+        "send_keys": null,
+        "scroll_to_text": null,
+        "get_dropdown_options": null,
+        "select_dropdown_option": null,
+        "drag_drop": null
+      }
+    ]
+  },
+  "model_actions": {
+    "go_to_url": {
+      "url": "https://www.google.com"
+    },
+    "interacted_element": null
+  },
+  "extracted_content": "\ud83d\udd17  Navigated to https://www.google.com"
+}

@@ -28,6 +28,23 @@ from pyobjtojson import obj_to_json
 load_dotenv()
 from browser_use import Agent
 
+# Start API server at application init time
+import subprocess
+import sys
+import threading
+
+def start_api_server():
+    subprocess.Popen(
+        [sys.executable, "api.py"],
+        cwd=os.path.dirname(__file__)
+    )
+    print("Started api.py server in background")
+
+# Start API server in a background thread
+threading.Thread(target=start_api_server, daemon=True).start()
+# Wait a moment for the server to start
+time.sleep(1)
+
 # Create logs and recordings directories if they don't exist
 LOGS_DIR = os.path.join(os.path.dirname(__file__), 'logs')
 RECORDINGS_DIR = os.path.join(os.path.dirname(__file__), 'recordings')
@@ -115,12 +132,20 @@ from agent_manager import AgentManager
 # Create a singleton instance
 agent_manager = AgentManager()
 
+def send_agent_history_step(data):
+    """Send the agent step data to the recording API"""
+    url = "http://127.0.0.1:9000/post_agent_history_step"
+    response = requests.post(url, json=data)
+    return response.json()
+
 
 # --- Action logger for browser actions as JSON ---
 def record_activity_after(agent_id: str):
-    """Returns an async callback that logs each action as JSON to logs/browser_actions.log."""
+    """Returns an async callback that logs each action using the recording API."""
     async def action_logger(agent):
         try:
+            print(f'--- ON_STEP_END HOOK for agent {agent_id} ---')
+            
             # Get state and history objects
             state = agent.state
             history = state.history
@@ -134,27 +159,19 @@ def record_activity_after(agent_id: str):
             last_entry = history.history[-1]
             step_number = len(history.history)
             
-            # Log step info (URL/title)
+            # Log basic step info
             browser_logger = logging.getLogger('browser_use')
             url = last_entry.state.url if hasattr(last_entry.state, "url") else "No URL"
             title = last_entry.state.title if hasattr(last_entry.state, "title") else "No title"
             browser_logger.info(f"Step {step_number:03d} → {url} ({title!r})")
             
-            # Handle screenshot (if present)
+            # Extract screenshot and handle streaming queue
             screenshot_data = None
             if hasattr(last_entry.state, "screenshot"):
                 screenshot_data = last_entry.state.screenshot
                 
                 if screenshot_data:
-                    # Save screenshot to file
-                    agent_dir = Path(SCREENSHOTS_DIR) / agent_id
-                    agent_dir.mkdir(parents=True, exist_ok=True)
-                    img = base64.b64decode(screenshot_data)
-                    path = agent_dir / f"step_{step_number:03d}.png"
-                    with open(path, 'wb') as f:
-                        f.write(img)
-                    
-                    # Add to streaming queue
+                    # We'll still maintain the streaming queue for UI updates
                     with screenshot_lock:
                         screenshot_queue.put({
                             "agent_id": agent_id,
@@ -162,128 +179,114 @@ def record_activity_after(agent_id: str):
                             "data": screenshot_data
                         })
             
-            # Record action information (similar to record_activity_after)
+            # Process data for API submission
+            result = last_entry.result[-1] if hasattr(last_entry, "result") and last_entry.result else None
+            actions = []
+            brain = None
+            
             if hasattr(last_entry, "model_output") and last_entry.model_output:
-                result = last_entry.result[-1] if last_entry.result else None
-                
-                # Build action payloads
-                actions = []
+                # Extract actions
                 if hasattr(last_entry.model_output, "action"):
-                    actions = [a.model_dump(exclude_none=True) for a in last_entry.model_output.action]
+                    actions = obj_to_json(
+                        obj=[a for a in last_entry.model_output.action]
+                    )
                 
                 # Get brain state
-                brain = last_entry.model_output.current_state if hasattr(last_entry.model_output, "current_state") else None
-                
-                # Construct log record (safely check for attributes)
-                record = {
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "step": step_number,
-                    "url": url,
+                if hasattr(last_entry.model_output, "current_state"):
+                    brain = last_entry.model_output.current_state
+            
+            # Build step summary to send to API
+            model_step_summary = {
+                "agent_id": agent_id,
+                "event_type": "post_step",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "step_number": step_number,
+                "url": url,
+                "title": title,
+                "website_screenshot": screenshot_data,
+                "website_html": None,  # Not capturing HTML in this hook
+                "actions": actions,
+                "brain_state": {
                     "memory": brain.memory if brain and hasattr(brain, "memory") else None,
-                    "next_goal": brain.next_goal if brain and hasattr(brain, "next_goal") else None,
-                    "actions": actions,
+                    "next_goal": brain.next_goal if brain and hasattr(brain, "next_goal") else None
+                },
+                "result": {
                     "success": result.error is None if result else False,
-                    "error": result.error if result else None
+                    "error": result.error if result and hasattr(result, "error") else None
                 }
+            }
+            
+            # Send data to the API
+            result = send_agent_history_step(data=model_step_summary)
+            print(f"Recording API response: {result}")
                 
-                # Write to log file
-                log_path = os.path.join(LOGS_DIR, 'browser_actions.log')
-                with open(log_path, 'a', encoding='utf-8') as f:
-                    f.write(json.dumps(record) + '\n')
-                    
         except Exception as e:
             # Robust exception handling
-            logger.error(f"Error in unified callback: {str(e)}", exc_info=True)
+            logger.error(f"Error in post-step hook for agent {agent_id}: {str(e)}", exc_info=True)
+    
     return action_logger
 
-def send_agent_history_step(data):
-    """Send the agent step data to the recording API"""
-    url = "http://127.0.0.1:9000/post_agent_history_step"
-    response = requests.post(url, json=data)
-    return response.json()
-
-
-async def record_activity_before(agent_obj):
-    """Hook function that captures and records agent activity at each step"""
-    website_html = None
-    website_screenshot = None
-    urls_json_last_elem = None
-    model_thoughts_last_elem = None
-    model_outputs_json_last_elem = None
-    model_actions_json_last_elem = None
-    extracted_content_json_last_elem = None
-
-    print('--- ON_STEP_START HOOK ---')
-    
-    # Capture current page state
-    #website_html = await agent_obj.browser_context.get_page_html()
-    #website_screenshot = await agent_obj.browser_context.take_screenshot()
-
-    # Make sure we have state history
-    if hasattr(agent_obj, "state"):
-        history = agent_obj.state.history
-    else:
-        history = None
-        print("Warning: Agent has no state history")
-        return
-
-    # Process model thoughts
-    model_thoughts = obj_to_json(
-        obj=history.model_thoughts(),
-    )
-    if len(model_thoughts) > 0:
-        model_thoughts_last_elem = model_thoughts[-1]
-
-    # Process model outputs
-    model_outputs = agent_obj.state.history.model_outputs()
-    model_outputs_json = obj_to_json(
-        obj=model_outputs,
-    )
-    if len(model_outputs_json) > 0:
-        model_outputs_json_last_elem = model_outputs_json[-1]
-
-    # Process model actions
-    model_actions = agent_obj.state.history.model_actions()
-    model_actions_json = obj_to_json(
-        obj=model_actions,
-    )
-    if len(model_actions_json) > 0:
-        model_actions_json_last_elem = model_actions_json[-1]
-
-    # Process extracted content
-    extracted_content = agent_obj.state.history.extracted_content()
-    extracted_content_json = obj_to_json(
-        obj=extracted_content,
-    )
-    if len(extracted_content_json) > 0:
-        extracted_content_json_last_elem = extracted_content_json[-1]
-
-    # Process URLs
-    urls = agent_obj.state.history.urls()
-    urls_json = obj_to_json(
-        obj=urls,
-    )
-    if len(urls_json) > 0:
-        urls_json_last_elem = urls_json[-1]
-
-    # Create a summary of all data for this step
-    model_step_summary = {
-        "website_html": website_html,
-        "website_screenshot": website_screenshot,
-        "url": urls_json_last_elem,
-        "model_thoughts": model_thoughts_last_elem,
-        "model_outputs": model_outputs_json_last_elem,
-        "model_actions": model_actions_json_last_elem,
-        "extracted_content": extracted_content_json_last_elem
-    }
-
-    print("--- MODEL STEP SUMMARY ---")
-    print(f"URL: {urls_json_last_elem}")
-    
-    # Send data to the API
-    result = send_agent_history_step(data=model_step_summary)
-    print(f"Recording API response: {result}")
-
+def record_activity_before(agent_id: str):
+    """Returns an async callback that logs agent state before each step."""
+    async def before_step_hook(agent):
+        try:
+            print(f'--- ON_STEP_START HOOK for agent {agent_id} ---')
+            
+            website_html = None
+            website_screenshot = None
+            
+            # Make sure we have state history
+            if not hasattr(agent, "state") or not agent.state:
+                logger.warning(f"Agent {agent_id}: No state available")
+                return
+                
+            history = agent.state.history
+            if not history:
+                logger.warning(f"Agent {agent_id}: No history available")
+                return
+            
+            # Process model data
+            model_thoughts = obj_to_json(obj=history.model_thoughts())
+            model_thoughts_last_elem = model_thoughts[-1] if model_thoughts else None
+            
+            model_outputs = obj_to_json(obj=history.model_outputs())
+            model_outputs_last_elem = model_outputs[-1] if model_outputs else None
+            
+            model_actions = obj_to_json(obj=history.model_actions())
+            model_actions_last_elem = model_actions[-1] if model_actions else None
+            
+            extracted_content = obj_to_json(obj=history.extracted_content())
+            extracted_content_last_elem = extracted_content[-1] if extracted_content else None
+            
+            urls = obj_to_json(obj=history.urls())
+            urls_last_elem = urls[-1] if urls else None
+            
+            # Create a summary of all data for this step
+            model_step_summary = {
+                "agent_id": agent_id,
+                "event_type": "pre_step",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "step_number": len(history.history) if history.history else 0,
+                "website_html": website_html,
+                "website_screenshot": website_screenshot,
+                "url": urls_last_elem,
+                "model_thoughts": model_thoughts_last_elem,
+                "model_outputs": model_outputs_last_elem,
+                "model_actions": model_actions_last_elem,
+                "extracted_content": extracted_content_last_elem
+            }
+            
+            print("--- MODEL STEP SUMMARY ---")
+            print(f"URL: {urls_last_elem}")
+            
+            # Send data to the API
+            result = send_agent_history_step(data=model_step_summary)
+            print(f"Recording API response: {result}")
+            
+        except Exception as e:
+            logger.error(f"Error in pre-step hook for agent {agent_id}: {str(e)}", exc_info=True)
+            
+    return before_step_hook
 
 @app.get('/')
 async def read_root():
@@ -315,7 +318,7 @@ async def run_agent(agent_id: str, request: RunRequest):
         task = asyncio.create_task(
             agent.run(
                 on_step_end=record_activity_after(agent_id),
-                on_step_start=record_activity_before,
+                on_step_start=record_activity_before(agent_id),
                 ))
 
         setup_time = time.time() - start_time
@@ -487,23 +490,8 @@ async def get_system_stats():
 
 
 if __name__ == '__main__':
-    import subprocess
-    import sys
-    import time
 
-#    # Start api.py as a subprocess
-#    api_proc = subprocess.Popen(
-#        [sys.executable, "api.py"],
-#        cwd=os.path.dirname(__file__)
-#    )
-#    print("Started api.py subprocess")
-#
-#    # Optional: Wait a bit to ensure api.py is up before starting main FastAPI
-#    time.sleep(1)
 
     import uvicorn
-    #try:
+
     uvicorn.run(app, host='0.0.0.0', port=8000)
-    #finally:
-        # Terminate api.py when main.py exits
-        #api_proc.terminate()

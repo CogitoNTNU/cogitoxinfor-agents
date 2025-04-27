@@ -40,16 +40,29 @@ async def post_agent_history_step(request: Request):
     data_dir = Path("./data")
     data_dir.mkdir(exist_ok=True)
     
-    recordings_dir = data_dir / "agent_history"
+    # Determine which event type we're dealing with (pre_step or post_step)
+    event_type = data.get("event_type", "unknown")
+    agent_id = data.get("agent_id", "unknown")
+    
+    # Create agent-specific directory
+    agent_dir = data_dir / agent_id
+    agent_dir.mkdir(exist_ok=True)
+    
+    # Create event-type specific directories
+    event_dir = agent_dir / event_type
+    event_dir.mkdir(exist_ok=True)
+    
+    # Create separate directories for different content types
+    recordings_dir = event_dir / "json"
     recordings_dir.mkdir(exist_ok=True)
     
-    #screenshots_dir = data_dir / "screenshots"
-    #screenshots_dir.mkdir(exist_ok=True)
+    screenshots_dir = event_dir / "screenshots" 
+    screenshots_dir.mkdir(exist_ok=True)
     
-    #html_dir = data_dir / "html_content"
-    #html_dir.mkdir(exist_ok=True)
+    html_dir = event_dir / "html"
+    html_dir.mkdir(exist_ok=True)
 
-    # Determine the next file number by examining existing .json files
+    # Determine the next file number within this specific event type
     existing_numbers = []
     for item in recordings_dir.iterdir():
         if item.is_file() and item.suffix == ".json":
@@ -60,13 +73,18 @@ async def post_agent_history_step(request: Request):
                 # In case the file name isn't just a number
                 pass
 
-    if existing_numbers:
-        next_number = max(existing_numbers) + 1
+    next_number = max(existing_numbers) + 1 if existing_numbers else 1
+    
+    # Get step number from the data (different fields for pre and post)
+    step_number = data.get("step_number")
+    if step_number is not None:
+        # Use the step number as the file name if available
+        file_name = f"{step_number:03d}"
     else:
-        next_number = 1
+        file_name = f"{next_number:03d}"
 
     # Construct the file path
-    file_path = recordings_dir / f"{next_number}.json"
+    file_path = recordings_dir / f"{file_name}.json"
 
     # Extract the screenshot and HTML before saving the main JSON
     website_screenshot = data.get("website_screenshot")
@@ -75,19 +93,25 @@ async def post_agent_history_step(request: Request):
     # Remove large fields from the JSON before saving
     clean_data = {**data}
     if website_screenshot:
-        clean_data["website_screenshot"] = f"See screenshots/{next_number}.png"
+        clean_data["website_screenshot"] = f"See screenshots/{file_name}.png"
         
         # Save the screenshot
-        screenshot_path = screenshots_dir / f"{next_number}.png"
-        b64_to_png(website_screenshot, screenshot_path)
+        screenshot_path = screenshots_dir / f"{file_name}.png"
+        try:
+            b64_to_png(website_screenshot, screenshot_path)
+        except Exception as e:
+            print(f"Error saving screenshot: {e}")
     
     if website_html:
-        clean_data["website_html"] = f"See html_content/{next_number}.html"
+        clean_data["website_html"] = f"See html/{file_name}.html"
         
         # Save the HTML
-        html_path = html_dir / f"{next_number}.html"
-        with html_path.open("w", encoding="utf-8") as f:
-            f.write(website_html)
+        html_path = html_dir / f"{file_name}.html"
+        try:
+            with html_path.open("w", encoding="utf-8") as f:
+                f.write(website_html)
+        except Exception as e:
+            print(f"Error saving HTML: {e}")
 
     # Save the JSON data to the file
     with file_path.open("w") as f:
@@ -96,7 +120,9 @@ async def post_agent_history_step(request: Request):
     return {
         "status": "ok", 
         "message": f"Saved to {file_path}",
-        "file_id": next_number
+        "file_id": file_name,
+        "event_type": event_type,
+        "agent_id": agent_id
     }
 
 

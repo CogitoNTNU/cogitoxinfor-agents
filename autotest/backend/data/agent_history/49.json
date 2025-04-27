@@ -1,0 +1,13 @@
+{
+  "agent_id": "ce042468-d677-4031-858a-8ce1faa24610",
+  "timestamp": "2025-04-27T16:54:12.561041+00:00",
+  "step": 0,
+  "event_type": "pre_step",
+  "website_html": null,
+  "website_screenshot": null,
+  "url": null,
+  "model_thoughts": null,
+  "model_outputs": null,
+  "model_actions": null,
+  "extracted_content": null
+}

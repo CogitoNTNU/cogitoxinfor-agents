@@ -1,0 +1,115 @@
+{
+  "website_html": null,
+  "website_screenshot": null,
+  "url": "about:blank",
+  "model_thoughts": {
+    "evaluation_previous_goal": "Unknown - The task of accessing Google has not been initiated yet because the current page is empty and no actions have been performed yet.",
+    "memory": "No actions have been taken yet. Current step is 1/100 and the status is about to change as I will now search for 'python' on Google.",
+    "next_goal": "Initiate a search for 'python' on Google."
+  },
+  "model_outputs": {
+    "current_state": {
+      "evaluation_previous_goal": "Unknown - The task of accessing Google has not been initiated yet because the current page is empty and no actions have been performed yet.",
+      "memory": "No actions have been taken yet. Current step is 1/100 and the status is about to change as I will now search for 'python' on Google.",
+      "next_goal": "Initiate a search for 'python' on Google."
+    },
+    "action": [
+      {
+        "done": null,
+        "search_google": null,
+        "go_to_url": {
+          "url": "https://www.google.com"
+        },
+        "go_back": null,
+        "wait": null,
+        "click_element_by_index": null,
+        "input_text": null,
+        "save_pdf": null,
+        "switch_tab": null,
+        "open_tab": null,
+        "close_tab": null,
+        "extract_content": null,
+        "scroll_down": null,
+        "scroll_up": null,
+        "send_keys": null,
+        "scroll_to_text": null,
+        "get_dropdown_options": null,
+        "select_dropdown_option": null,
+        "drag_drop": null
+      },
+      {
+        "done": null,
+        "search_google": null,
+        "go_to_url": null,
+        "go_back": null,
+        "wait": {
+          "seconds": 3
+        },
+        "click_element_by_index": null,
+        "input_text": null,
+        "save_pdf": null,
+        "switch_tab": null,
+        "open_tab": null,
+        "close_tab": null,
+        "extract_content": null,
+        "scroll_down": null,
+        "scroll_up": null,
+        "send_keys": null,
+        "scroll_to_text": null,
+        "get_dropdown_options": null,
+        "select_dropdown_option": null,
+        "drag_drop": null
+      },
+      {
+        "done": null,
+        "search_google": null,
+        "go_to_url": null,
+        "go_back": null,
+        "wait": null,
+        "click_element_by_index": null,
+        "input_text": {
+          "index": 1,
+          "text": "python",
+          "xpath": null
+        },
+        "save_pdf": null,
+        "switch_tab": null,
+        "open_tab": null,
+        "close_tab": null,
+        "extract_content": null,
+        "scroll_down": null,
+        "scroll_up": null,
+        "send_keys": null,
+        "scroll_to_text": null,
+        "get_dropdown_options": null,
+        "select_dropdown_option": null,
+        "drag_drop": null
+      },
+      {
+        "done": null,
+        "search_google": null,
+        "go_to_url": null,
+        "go_back": null,
+        "wait": null,
+        "click_element_by_index": null,
+        "input_text": null,
+        "save_pdf": null,
+        "switch_tab": null,
+        "open_tab": null,
+        "close_tab": null,
+        "extract_content": null,
+        "scroll_down": null,
+        "scroll_up": null,
+        "send_keys": null,
+        "scroll_to_text": null,
+        "get_dropdown_options": null,
+        "select_dropdown_option": null,
+        "drag_drop": null
+      }
+    ]
+  },
+  "model_actions": {
+    "interacted_element": null
+  },
+  "extracted_content": "Element index changed after action 2 / 4, because page changed."
+}

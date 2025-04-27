@@ -1,0 +1,48 @@
+{
+  "agent_id": "13356a2f-f4cb-421b-b201-48c8286e8bab",
+  "event_type": "pre_step",
+  "timestamp": "2025-04-27T17:24:04.929193+00:00",
+  "step_number": 4,
+  "website_html": null,
+  "website_screenshot": null,
+  "url": "https://www.google.com/",
+  "model_thoughts": "<circular reference>",
+  "model_outputs": "<circular reference>",
+  "model_actions": {
+    "click_element_by_index": {
+      "index": 9
+    },
+    "interacted_element": {
+      "tag_name": "input",
+      "xpath": "html/body/div/div[3]/form/div/div/div[3]/center/input",
+      "highlight_index": 9,
+      "entire_parent_branch_path": [
+        "div",
+        "div",
+        "form",
+        "div",
+        "div",
+        "div",
+        "center",
+        "input"
+      ],
+      "attributes": {
+        "class": "gNO89b",
+        "value": "Google-s\u00f8k",
+        "aria-label": "Google-s\u00f8k",
+        "name": "btnK",
+        "role": "button",
+        "tabindex": "0",
+        "type": "submit",
+        "data-ved": "0ahUKEwiW5fOl3fiMAxV2avEDHTOoIj8Q4dUDCA8",
+        "style": ""
+      },
+      "shadow_root": false,
+      "css_selector": "html > body > div > div:nth-of-type(3) > form > div > div > div:nth-of-type(3) > center > input.gNO89b[aria-label=\"Google-s\u00f8k\"][name=\"btnK\"][role=\"button\"][type=\"submit\"]",
+      "page_coordinates": null,
+      "viewport_coordinates": null,
+      "viewport_info": null
+    }
+  },
+  "extracted_content": "Element index changed after action 1 / 2, because page changed."
+}

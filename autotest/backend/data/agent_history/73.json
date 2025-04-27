@@ -1,0 +1,64 @@
+{
+  "agent_id": "f55b2b40-cf7c-421d-b9a5-517f7ded3761",
+  "event_type": "pre_step",
+  "timestamp": "2025-04-27T17:12:50.868768+00:00",
+  "step_number": 4,
+  "website_html": null,
+  "website_screenshot": null,
+  "url": "https://www.google.com/",
+  "model_thoughts": "<circular reference>",
+  "model_outputs": "<circular reference>",
+  "model_actions": {
+    "input_text": {
+      "index": 8,
+      "text": "python"
+    },
+    "interacted_element": {
+      "tag_name": "textarea",
+      "xpath": "html/body/div/div[3]/form/div/div/div/div/div[2]/textarea",
+      "highlight_index": 8,
+      "entire_parent_branch_path": [
+        "div",
+        "div",
+        "form",
+        "div",
+        "div",
+        "div",
+        "div",
+        "div",
+        "textarea"
+      ],
+      "attributes": {
+        "class": "gLFyf",
+        "aria-controls": "Alh6id",
+        "aria-owns": "Alh6id",
+        "autofocus": "",
+        "title": "S\u00f8k",
+        "value": "",
+        "aria-label": "S\u00f8k",
+        "placeholder": "",
+        "aria-autocomplete": "both",
+        "aria-expanded": "false",
+        "aria-haspopup": "false",
+        "autocapitalize": "off",
+        "autocomplete": "off",
+        "autocorrect": "off",
+        "id": "APjFqb",
+        "maxlength": "2048",
+        "name": "q",
+        "role": "combobox",
+        "rows": "1",
+        "spellcheck": "false",
+        "jsaction": "paste:puy29d",
+        "data-ved": "0ahUKEwj0ydrj2viMAxU0BdsEHSkBDZQQ39UDCAU",
+        "style": ""
+      },
+      "shadow_root": false,
+      "css_selector": "html > body > div > div:nth-of-type(3) > form > div > div > div > div > div:nth-of-type(2) > textarea.gLFyf[title=\"S\u00f8k\"][aria-label=\"S\u00f8k\"][placeholder][autocomplete=\"off\"][id=\"APjFqb\"][name=\"q\"][role=\"combobox\"]",
+      "page_coordinates": null,
+      "viewport_coordinates": null,
+      "viewport_info": null
+    }
+  },
+  "extracted_content": "\u2328\ufe0f  Input python into index 8"
+}

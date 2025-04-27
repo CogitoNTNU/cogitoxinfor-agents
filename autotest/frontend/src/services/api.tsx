@@ -33,12 +33,6 @@ export const agentApi = {
   getSystemStats: () => 
     axios.get(`${API_URL}/system/stats`),
   
-  // Get screenshot for a specific step (or latest if step is not provided)
-  getAgentScreenshot: (agentId: string, step: number | null = null) => {
-    const stepParam = step !== null ? `?step=${step}` : '';
-    return axios.get(`${API_URL}/agent/${agentId}/screenshot${stepParam}`);
-  },
-  
   // Get agent history information
   getAgentHistory: (agentId: string) => 
     axios.get(`${API_URL}/agent/${agentId}/history`),

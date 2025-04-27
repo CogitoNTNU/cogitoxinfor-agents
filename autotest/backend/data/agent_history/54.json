@@ -1,0 +1,15 @@
+{
+  "agent_id": "ce042468-d677-4031-858a-8ce1faa24610",
+  "timestamp": "2025-04-27T16:54:36.216010+00:00",
+  "step": 5,
+  "event_type": "pre_step",
+  "website_html": null,
+  "website_screenshot": null,
+  "url": "https://www.google.com/",
+  "model_thoughts": "<circular reference>",
+  "model_outputs": "<circular reference>",
+  "model_actions": {
+    "interacted_element": null
+  },
+  "extracted_content": "\u2328\ufe0f  Input python into index 8"
+}
