@@ -1,8 +1,6 @@
 import asyncio
 import random
-
 import aiohttp
-
 
 async def test_agent(session, agent_id, task):
 	# Start agent
