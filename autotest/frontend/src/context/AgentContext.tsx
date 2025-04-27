@@ -68,6 +68,13 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
   const [interruptMessage, setInterruptMessage] = useState<string | null>(null); // Add state for interrupt message
   const [agentIds, setAgentIds] = useState<string[]>([]); // Added state for agentIds
 
+  // Ensure that when currentAgentId changes it appears in agentIds
+  useEffect(() => {
+    if (currentAgentId && !agentIds.includes(currentAgentId)) {
+      setAgentIds(prev => [...prev, currentAgentId]);
+    }
+  }, [currentAgentId, agentIds]);
+
   // Clear all screenshots
   const clearScreenshots = useCallback(() => {
     setScreenshots([]);
@@ -82,16 +89,14 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
   
   // Run an agent with the current ID and given task
   const runAgent = useCallback(async (payload: AgentRunPayload) => { // Updated parameter type
-    if (!currentAgentId || (!payload.query.trim() && !payload.test_actions.length)) { // Updated check
-      console.error("Cannot run agent: Missing agent ID or task/test actions"); // Updated message
+    if (!currentAgentId) {
+      console.error("Cannot run agent: Missing agent ID");
       return;
     }
 
     try {
       console.log(`Running agent ${currentAgentId} with payload:`, payload); // Updated log
       const response = await agentApi.runAgent(currentAgentId, payload.query); // Use payload.query
-      // Add this agent to the list of active panels
-      setAgentIds(prev => [...prev, currentAgentId]);
       console.log("Agent run response:", response);
       setIsRunning(true);
       // Don't return the response

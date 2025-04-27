@@ -4,27 +4,11 @@ import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
 import { Play, Square, Pause, PlayCircle } from 'lucide-react';
 import { useAgent } from '../context/AgentContext';
-import { agentApi } from '../services/api';
-import { v4 as uuidv4 } from 'uuid'; // You'll need to add this dependency
+import { agentApi } from '@/services/api.tsx';
 
 const AgentController: React.FC = () => {
   const { isRunning, isPaused, currentAgentId, setCurrentAgentId, runAgent } = useAgent();
   const [task, setTask] = useState('');
-  const [localAgentId, setLocalAgentId] = useState('');
-  
-  // Generate a local agent ID if one doesn't exist
-  useEffect(() => {
-    if (currentAgentId) {
-      setLocalAgentId(currentAgentId);
-    } else {
-      const newAgentId = `agent-${uuidv4().substring(0, 8)}`;
-      setLocalAgentId(newAgentId);
-      // If your context provides a setter:
-      if (setCurrentAgentId) {
-        setCurrentAgentId(newAgentId);
-      }
-    }
-  }, [currentAgentId, setCurrentAgentId]);
 
   // Handle pause action
   const handlePause = async () => {
@@ -56,28 +40,19 @@ const AgentController: React.FC = () => {
     }
   };
   
-  // Modified handleRun function to use the context's runAgent method
   const handleRun = async () => {
-    console.log("Run button clicked", { task });
-    
-    if (!task.trim()) {
-      console.log("Task is empty, not sending request");
-      return;
-    }
-    
+    if (!task.trim()) return;
     try {
-      const payload = {
-        task,
-        agentId: localAgentId,
-        testing: false, // Assuming default value
-        human_intervention: false, // Assuming default value
-        query: task, // Assuming query is the same as task
-        test_actions: [] // Assuming default empty array
-      };
-      // Use the context's runAgent method
-      await runAgent(payload); // Pass the payload object
-      console.log("Agent run request successful");
-      setTask(''); // Clear task field after running
+      let agentId = currentAgentId;
+      if (!agentId) {
+        // create new agent if none selected
+        const resp = await agentApi.createAgent();
+        agentId = resp.data.agent_id;
+        setCurrentAgentId(agentId);
+      }
+      // run (or re-run) the agent with the task
+      await runAgent({ query: task, testing: false, human_intervention: false, test_actions: [] });
+      setTask('');
     } catch (error) {
       console.error("Error running agent:", error);
     }
@@ -99,24 +74,24 @@ const AgentController: React.FC = () => {
           rows={3}
           className="mb-2 border-none focus:border-none focus:ring-0 focus:outline-none resize-none"
         />
-        <div className="flex items-center justify-center space-x-4">
+        <div className="relative">
           {!isRunning && (
             <Button onClick={handleRun} variant="ghost" className="absolute bottom-2 right-2 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
               <Play className="h-6 w-6" />
             </Button>
           )}
           {isRunning && !isPaused && (
-            <Button onClick={handlePause} variant="ghost">
+            <Button onClick={handlePause} variant="ghost" className="absolute bottom-2 right-2 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
               <Pause className="h-6 w-6" />
             </Button>
           )}
           {isPaused && (
-            <Button onClick={handleResume} variant="ghost">
+            <Button onClick={handleResume} variant="ghost" className="absolute bottom-2 right-2 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
               <PlayCircle className="h-6 w-6" />
             </Button>
           )}
           {(isRunning || isPaused) && (
-            <Button onClick={handleStop} variant="ghost">
+            <Button onClick={handleStop} variant="ghost" className="absolute bottom-2 right-14 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
               <Square className="h-6 w-6" />
             </Button>
           )}

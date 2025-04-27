@@ -52,7 +52,6 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
   return (
     <Card className={cn("w-full", className)}>
       <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Agent Activity</CardTitle>
         {logs.length > 0 && (
           <Button variant="outline" size="sm" onClick={onClear}>
             <Trash2 className="h-4 w-4 mr-2" />
@@ -62,24 +61,8 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
       </CardHeader>
       
       <CardContent className="p-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 mb-4">
-            <TabsTrigger value="logs" className="flex items-center">
-              <Code className="h-4 w-4 mr-2" />
-              Logs
-            </TabsTrigger>
-            <TabsTrigger value="actions" className="flex items-center">
-              <Globe className="h-4 w-4 mr-2" />
-              Actions
-            </TabsTrigger>
-            <TabsTrigger value="screenshots" className="flex items-center">
-              <Image className="h-4 w-4 mr-2" />
-              Screenshots
-            </TabsTrigger>
-          </TabsList>
           
           {/* Regular logs tab content */}
-          <TabsContent value="logs">
             <ScrollArea className="h-[300px] pr-4">
               {logs.length === 0 && isRunning ? (
                  actionHistory && actionHistory.length > 0 ? ( // Keep actionHistory display if it's passed as a prop
@@ -130,46 +113,6 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
                 </div>
               )}
             </ScrollArea>
-          </TabsContent>
-
-          {/* Actions tab showing navigation history */}
-          <TabsContent value="actions">
-            <ScrollArea className="h-[300px] pr-4">
-              {!actionHistory || actionHistory.length === 0 ? (
-                <div className="flex items-center justify-center h-full border border-dashed rounded-md">
-                  <p className="text-muted-foreground">No actions recorded</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {actionHistory.map((action, idx) => (
-                    <div key={idx} className="border rounded-md p-2 text-sm">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-medium text-purple-500">
-                          Step {action.step_number + 1}
-                        </span>
-                        <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-                          {action.title || 'Untitled Page'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-blue-500 mb-1 overflow-hidden text-ellipsis">
-                        {action.url}
-                      </p>
-                      <p className="whitespace-pre-wrap break-words border-t pt-1 mt-1 text-muted-foreground">
-                        Goal: {action.goal || 'Not specified'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-
-          {/* Screenshots tab - This tab's content should be handled by ScreenshotDisplay */}
-          {/* Keeping the tab trigger for now, but the content will be empty or removed later */}
-           <TabsContent value="screenshots">
-             {/* ScreenshotDisplay will be rendered outside of Tabs */}
-           </TabsContent>
-        </Tabs>
       </CardContent>
     </Card>
   );

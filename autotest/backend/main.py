@@ -443,10 +443,12 @@ async def list_agents():
 
 @app.get('/agent/{agent_id}/screenshot')
 async def get_agent_screenshot(agent_id: str, step: Optional[int] = None, save: bool = True):
-    """Get the latest screenshot or a specific step's screenshot"""
+    """Get the latest screenshot or a specific step's screenshot and return as a file."""
     try:
         agent = agent_manager.get_agent(agent_id)
-        
+
+        screenshot_data = None
+        step_num = None
         # If agent has history
         if hasattr(agent, "history") and agent.history and agent.history.history:
             # If step is provided, get that specific step's screenshot
@@ -457,22 +459,26 @@ async def get_agent_screenshot(agent_id: str, step: Optional[int] = None, save: 
                 # Otherwise return the latest screenshot
                 screenshot_data = agent.history.history[-1].state.screenshot
                 step_num = len(agent.history.history) - 1
-                
-            if screenshot_data and save:
-                agent_manager.save_agent_screenshot(agent_id, screenshot_data, step_num)
-                
-            if screenshot_data:
-                return {"screenshot": screenshot_data, "step": step_num}
-        
-        # If we can't get a screenshot from history, try to take a new one
-        # FIXED: Removed the use_vision parameter
-        current_state = await agent.browser_context.get_state()
-        if current_state and current_state.screenshot:
-            screenshot_data = current_state.screenshot
-            if save:
-                agent_manager.save_agent_screenshot(agent_id, screenshot_data)
-            return {"screenshot": screenshot_data, "step": -1}
-            
+        else:
+            # If we can't get a screenshot from history, try to take a new one
+            current_state = await agent.browser_context.get_state()
+            if current_state and current_state.screenshot:
+                screenshot_data = current_state.screenshot
+                step_num = -1
+
+        if screenshot_data and save:
+            # Save screenshot and get the relative URL path
+            url_path = agent_manager.save_agent_screenshot(agent_id, screenshot_data, step_num)
+            # Convert the URL path to a file system path
+            # url_path: /screenshots/{agent_id}/{filename}
+            filepath = os.path.join(
+                SCREENSHOTS_DIR,
+                agent_id,
+                os.path.basename(url_path)
+            )
+            # Return the file directly
+            return FileResponse(filepath)
+
         raise HTTPException(status_code=404, detail="No screenshot available")
     except Exception as e:
         logger.error(f"Error getting screenshot for {agent_id}: {str(e)}")

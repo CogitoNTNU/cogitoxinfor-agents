@@ -8,8 +8,7 @@ from threading import Lock
 from typing import Any, Dict, Optional
 import json
 from datetime import datetime, timezone
-from pathlib import Path
-from pyobjtojson import obj_to_json  # Add this import
+import uuid
 
 import psutil
 from fastapi import FastAPI, HTTPException, Request
@@ -99,10 +98,10 @@ os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 # Mount static directories
 app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
 app.mount('/screenshots', StaticFiles(directory=SCREENSHOTS_DIR), name='screenshots')
+from pydantic import BaseModel
 
-class TaskRequest(BaseModel):
-    agent_id: str
-    task: str
+class RunRequest(BaseModel):
+    query: str
 
 
 class AgentManager:
@@ -346,171 +345,55 @@ async def read_root():
 	return FileResponse(os.path.join(STATIC_DIR, 'index.html'))
 
 
-# Add this function near other agent-related functions
-async def record_activity(agent):
-    """Record detailed agent activity at each step"""
-    try:
-        website_html = None
-        website_screenshot = None
-        url = None
-        model_thoughts = None
-        model_outputs = None
-        model_actions = None
-        extracted_content = None
-        
-        # Capture current page state
-        try:
-            website_html = await agent.browser_context.get_page_html()
-            website_screenshot = await agent.browser_context.take_screenshot()
-        except Exception as e:
-            logger.error(f"Error capturing page state: {str(e)}")
-        
-        # Make sure we have state history
-        if hasattr(agent, "state") and hasattr(agent.state, "history"):
-            history = agent.state.history
-            
-            # Process URLs
-            if hasattr(history, "urls") and callable(history.urls):
-                urls = history.urls()
-                if urls:
-                    url = urls[-1]
-            
-            # Process model thoughts
-            if hasattr(history, "model_thoughts") and callable(history.model_thoughts):
-                thoughts = history.model_thoughts()
-                if thoughts:
-                    model_thoughts = obj_to_json(thoughts[-1], check_circular=False)
-            
-            # Process model outputs
-            if hasattr(history, "model_outputs") and callable(history.model_outputs):
-                outputs = history.model_outputs()
-                if outputs:
-                    model_outputs = obj_to_json(outputs[-1], check_circular=False)
-            
-            # Process model actions
-            if hasattr(history, "model_actions") and callable(history.model_actions):
-                actions = history.model_actions()
-                if actions:
-                    model_actions = obj_to_json(actions[-1], check_circular=False)
-            
-            # Process extracted content
-            if hasattr(history, "extracted_content") and callable(history.extracted_content):
-                content = history.extracted_content()
-                if content:
-                    extracted_content = obj_to_json(content[-1], check_circular=False)
-        
-        # Create a summary of all data for this step
-        timestamp = datetime.now(timezone.utc).isoformat()
-        model_step_summary = {
-            "timestamp": timestamp,
-            "website_html": website_html,
-            "website_screenshot": website_screenshot,
-            "url": url,
-            "model_thoughts": model_thoughts,
-            "model_outputs": model_outputs,
-            "model_actions": model_actions,
-            "extracted_content": extracted_content
-        }
-        
-        # Send data to our own API endpoint
-        import requests
-        try:
-            response = requests.post(
-                "http://localhost:8000/post_agent_history_step", 
-                json=model_step_summary
-            )
-            logger.info(f"Recording API response: {response.status_code}")
-        except Exception as e:
-            logger.error(f"Error sending step data to API: {str(e)}")
-            
-    except Exception as e:
-        logger.error(f"Error in record_activity: {str(e)}")
-
-# Add near other API endpoints
-@app.post("/post_agent_history_step")
-async def post_agent_history_step(request: Request):
-    data = await request.json()
-    logger.info(f"Received agent history step data")
-    
-    # Ensure the recordings folder exists
-    recordings_folder = Path(RECORDINGS_DIR)
-    recordings_folder.mkdir(exist_ok=True)
-    
-    # Determine the next file number
-    existing_numbers = []
-    for item in recordings_folder.iterdir():
-        if item.is_file() and item.suffix == ".json":
-            try:
-                file_num = int(item.stem)
-                existing_numbers.append(file_num)
-            except ValueError:
-                pass
-    
-    next_number = max(existing_numbers) + 1 if existing_numbers else 1
-    
-    # Construct the file path
-    file_path = recordings_folder / f"{next_number}.json"
-    
-    # Save the JSON data to the file
-    with file_path.open("w") as f:
-        json.dump(data, f, indent=2)
-    
-    # If there's a screenshot in the data, save it separately
-    if "website_screenshot" in data and data["website_screenshot"]:
-        screenshot_folder = Path(SCREENSHOTS_DIR)
-        screenshot_folder.mkdir(exist_ok=True)
-        
-        try:
-            b64_to_png(data["website_screenshot"], 
-                       screenshot_folder / f"recording_{next_number}.png")
-        except Exception as e:
-            logger.error(f"Failed to save screenshot: {str(e)}")
-    
-    return {"status": "ok", "message": f"Saved to {file_path}"}
-
-
-# Modify the run_agent endpoint
-@app.post('/agent/run')
-async def run_agent(request: TaskRequest):
+@app.post('/agent/{agent_id}/run')
+async def run_agent(agent_id: str, request: RunRequest):
+    """
+    Create (always fresh) and start an agent with the given query.
+    """
     try:
         start_time = time.time()
-        if request.agent_id not in agent_manager.agents:
-            await agent_manager.create_agent(request.agent_id, request.task)
+        # If an agent already exists, stop and remove it so we start fresh
+        if agent_id in agent_manager.agents:
+            try:
+                agent_manager.get_agent(agent_id).stop()
+            except Exception:
+                pass
+            agent_manager.agents.pop(agent_id)
 
-        agent = agent_manager.get_agent(request.agent_id)
-        agent_manager.set_running(request.agent_id, True)
+        # Create a brand-new agent with this query
+        await agent_manager.create_agent(agent_id, request.query)
 
-        # Run in background task to not block, and log browser actions
+        agent = agent_manager.get_agent(agent_id)
+        agent_manager.set_running(agent_id, True)
+
+        # Kick off the browser‐automation in the background
         task = asyncio.create_task(
-            agent.run(
-                on_step_end=make_action_logger(request.agent_id),
-                on_step_start=record_activity  # Add this line
-            )
+            agent.run(on_step_end=make_action_logger(agent_id))
         )
 
         # Add completion callback for debugging
         def done_callback(future):
             try:
                 result = future.result()
-                # Save history after agent completes
-                agent_manager.save_agent_history(request.agent_id, request.task)
+                # Save history after agent completes (this saves more than just actions)
+                agent_manager.save_agent_history(agent_id, request.query)
             except Exception as e:
-                logger.error(f'Agent {request.agent_id} failed: {str(e)}')
+                logger.error(f'Agent {agent_id} failed: {str(e)}')
             finally:
-                agent_manager.set_running(request.agent_id, False)
+                agent_manager.set_running(agent_id, False)
 
         task.add_done_callback(done_callback)
 
         setup_time = time.time() - start_time
         return {
             'status': 'running',
-            'agent_id': request.agent_id,
-            'task': request.task,
+            'agent_id': agent_id,
+            'query': request.query,
             'setup_time_ms': setup_time * 1000,
             'total_agents': len(agent_manager.agents),
         }
     except Exception as e:
-        logger.error(f'Error running agent {request.agent_id}: {str(e)}')
+        logger.error(f'Error running agent {agent_id}: {str(e)}')
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -568,9 +451,22 @@ async def get_agent_status(agent_id: str):
 		raise HTTPException(status_code=400, detail=str(e))
 
 
+
 @app.get('/agents')
 async def list_agents():
+	"""Return a dict of {agent_id: {task, status}}."""
 	return agent_manager.list_agents()
+
+
+# Create a new agent and register it without running
+@app.post('/agent')
+async def create_agent():
+    """Create a new agent and register it without running."""
+    # Generate a unique agent ID
+    new_id = str(uuid.uuid4())
+    # Create the agent with an empty initial task
+    await agent_manager.create_agent(new_id, "")
+    return {"agent_id": new_id}
 
 @app.get('/agent/{agent_id}/screenshot')
 async def get_agent_screenshot(agent_id: str, step: Optional[int] = None, save: bool = True):
@@ -663,6 +559,7 @@ async def get_agent_history(agent_id: str, save_screenshots: bool = True):
         logger.error(f"Error getting history for {agent_id}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.get('/logs')
 async def event_stream():
     async def generate():
@@ -683,6 +580,38 @@ async def event_stream():
             await asyncio.sleep(0.1)
 
     return EventSourceResponse(generate())
+
+
+# Per-agent SSE stream endpoint
+@app.get('/agent/{agent_id}/stream')
+async def agent_stream(request: Request, agent_id: str):
+    """
+    SSE stream of logs and screenshots filtered by agent_id.
+    """
+    async def event_generator():
+        while True:
+            # If client disconnects, stop the loop
+            if await request.is_disconnected():
+                break
+
+            # Stream log entries
+            if not log_queue.empty():
+                with log_lock:
+                    while not log_queue.empty():
+                        log_entry = log_queue.get()
+                        yield {'event': 'log', 'data': log_entry}
+
+            # Stream screenshot entries for this agent
+            if not screenshot_queue.empty():
+                with screenshot_lock:
+                    while not screenshot_queue.empty():
+                        msg = screenshot_queue.get()
+                        if msg.get('agent_id') == agent_id:
+                            yield {'event': 'screenshot', 'data': json.dumps(msg)}
+
+            await asyncio.sleep(0.1)
+
+    return EventSourceResponse(event_generator())
 
 
 @app.get('/system/stats')

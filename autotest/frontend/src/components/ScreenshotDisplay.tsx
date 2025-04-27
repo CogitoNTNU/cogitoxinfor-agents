@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { ScrollArea } from './ui/scroll-area';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from './ui/carousel';
 import { Trash2, Maximize2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 // Removed useAgent import
 
-interface Screenshot {
-  // Updated interface to match SSE data structure
+
+export interface Screenshot {
+  id: string;
   url: string;
   // Assuming step and timestamp might not be directly available in SSE data
   // If needed, they would need to be added in Index.tsx before passing
@@ -39,7 +46,6 @@ export const ScreenshotDisplay: React.FC<ScreenshotDisplayProps> = ({
     <>
       <Card className={cn("w-full", className)}>
         <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">Screenshots</CardTitle>
           {screenshots.length > 0 && (
             <Button
               variant="outline"
@@ -51,52 +57,55 @@ export const ScreenshotDisplay: React.FC<ScreenshotDisplayProps> = ({
             </Button>
           )}
         </CardHeader>
-        <CardContent className="p-4">
+        <CardContent className="p-4 flex flex-col h-full">
           {screenshots.length === 0 && loading ? ( // Use loading prop
-              <div className="flex items-center justify-center h-[300px] border border-dashed rounded-md">
+              <div className="flex items-center justify-center flex-1 border border-dashed rounded-md">
                 <p className="text-muted-foreground">Agent Running...</p> {/* Or a loading indicator */}
               </div>
           ) : screenshots.length === 0 ? (
-            <div className="flex items-center justify-center h-[300px] border border-dashed rounded-md">
+            <div className="flex items-center justify-center flex-1 border border-dashed rounded-md">
               <p className="text-muted-foreground">No screenshots available</p>
             </div>
           ) : (
-            <ScrollArea className="h-[300px] pr-4">
-              <div className="grid grid-cols-2 gap-4">
-                {screenshots.map((screenshot, idx) => ( // Use idx for key and display index
-                  <div
-                    key={idx} // Use idx as key
-                    className="border rounded-md p-2 overflow-hidden"
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium">Screenshot {idx + 1}</span> {/* Display index */}
-                      {/* Timestamp might not be available */}
-                      {/* <span className="text-xs text-muted-foreground">
-                        {formatTimestamp(screenshot.timestamp)}
-                      </span> */}
-                    </div>
-                    <div className="relative group">
-                      <img
-                        src={screenshot.url} // Use url property
-                        alt={`Screenshot ${idx + 1}`} // Use index for alt text
-                        className="w-full h-auto rounded-md object-cover cursor-pointer"
-                        onClick={() => setSelectedScreenshot(screenshot)}
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setSelectedScreenshot(screenshot)}
-                        >
-                          <Maximize2 className="h-4 w-4 mr-2" />
-                          Expand
-                        </Button>
+            <div className="relative flex-1 overflow-visible">
+              <Carousel className="h-full w-full">
+                <CarouselPrevious
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/50 hover:bg-background z-10"
+                />
+                <CarouselContent className="h-full">
+                  {screenshots.map((screenshot) => (
+                    <CarouselItem key={screenshot.id}>
+                      <div className="border rounded-md p-2 overflow-hidden">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium">Screenshot {screenshots.indexOf(screenshot) + 1}</span>
+                        </div>
+                        <div className="relative group">
+                          <img
+                            src={screenshot.url}
+                            alt={`Screenshot ${screenshots.indexOf(screenshot) + 1}`}
+                            className="w-full h-auto rounded-md object-cover cursor-pointer"
+                            onClick={() => setSelectedScreenshot(screenshot)}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setSelectedScreenshot(screenshot)}
+                            >
+                              <Maximize2 className="h-4 w-4 mr-2" />
+                              Expand
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselNext
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/50 hover:bg-background z-10"
+                />
+              </Carousel>
+            </div>
           )}
         </CardContent>
       </Card>
