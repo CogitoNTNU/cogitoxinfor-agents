@@ -12,6 +12,10 @@ history/
 
 screenshots/
 
+data/
+logs/
+screenshots/
+autotest/backend/data/agent_history/
 # Distribution / packaging
 .Python
 build/
