@@ -44,9 +44,6 @@ async def post_agent_history_step(request: Request):
     
     screenshots_dir = event_dir / "screenshots" 
     screenshots_dir.mkdir(exist_ok=True)
-    
-    html_dir = event_dir / "html"
-    html_dir.mkdir(exist_ok=True)
 
     # Determine the next file number within this specific event type
     existing_numbers = []
@@ -87,17 +84,6 @@ async def post_agent_history_step(request: Request):
             b64_to_png(website_screenshot, screenshot_path)
         except Exception as e:
             logger.error(f"Error saving screenshot: {e}")
-    
-    if website_html:
-        clean_data["website_html"] = f"See html/{file_name}.html"
-        
-        # Save the HTML
-        html_path = html_dir / f"{file_name}.html"
-        try:
-            with html_path.open("w", encoding="utf-8") as f:
-                f.write(website_html)
-        except Exception as e:
-            logger.error(f"Error saving HTML: {e}")
 
     # Save the JSON data to the file
     with file_path.open("w") as f:

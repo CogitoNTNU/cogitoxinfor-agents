@@ -5,7 +5,6 @@ from typing import Any, Dict
 import psutil
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-from pathlib import Path
 
 # Load environment variables (for API keys)
 load_dotenv()
@@ -39,7 +38,7 @@ class AgentManager:
 
             try:
                 # Create agent-specific profile directory
-                agent_profile_dir = os.path.join(PROFILES_DIR, agent_id)
+                agent_profile_dir = os.path.join(PROFILES_DIR)
                 os.makedirs(agent_profile_dir, exist_ok=True)
                 
                 # Configure browser with persistent profile
@@ -65,7 +64,6 @@ class AgentManager:
                     'running': False,
                     'created_at': time.time(),
                     'last_active': time.time(),
-                    'profile_dir': agent_profile_dir  # Store profile directory
                 }
                 self.agents[agent_id] = agent
                 logger.info(f'Created agent {agent_id} with persistent profile at {agent_profile_dir}. Total agents: {len(self.agents)}')
