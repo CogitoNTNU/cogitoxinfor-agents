@@ -2,15 +2,10 @@ import asyncio
 import logging
 import os
 import time
-from logging.handlers import RotatingFileHandler
-from queue import Queue
-from threading import Lock
 from typing import Any, Dict, Optional
 import json
 from datetime import datetime, timezone
 import uuid
-
-import psutil
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -45,100 +40,14 @@ threading.Thread(target=start_api_server, daemon=True).start()
 # Wait a moment for the server to start
 time.sleep(1)
 
-# Create logs and recordings directories if they don't exist
-LOGS_DIR = os.path.join(os.path.dirname(__file__), 'logs')
-RECORDINGS_DIR = os.path.join(os.path.dirname(__file__), 'recordings')
-os.makedirs(LOGS_DIR, exist_ok=True)
-os.makedirs(RECORDINGS_DIR, exist_ok=True)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Create a rotating file handler (10MB per file, keep 5 backup files)
-file_handler = RotatingFileHandler(
-	os.path.join(LOGS_DIR, 'agent_manager.log'),
-	maxBytes=10 * 1024 * 1024,  # 10MB
-	backupCount=5,
-	encoding='utf-8',
+from logging_setup import (
+    get_logger, log_queue, log_lock, screenshot_queue, screenshot_lock,
+    setup_agent_logger, set_current_agent_id, STATIC_DIR,
 )
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(file_handler)
 
-# Create a separate file for agent-specific logs
-agent_file_handler = RotatingFileHandler(
-	os.path.join(LOGS_DIR, 'agents.log'),
-	maxBytes=10 * 1024 * 1024,  # 10MB
-	backupCount=5,
-	encoding='utf-8',
-)
-agent_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+# Then replace the logger initialization with:
+logger = get_logger(__name__)
 
-# Create a queue for real-time log messages
-log_queue = Queue()
-log_lock = Lock()
-
-# Create a queue for real-time screenshot messages
-screenshot_queue = Queue()
-screenshot_lock = Lock()
-
-from pathlib import Path
-
-class LogHandler(logging.Handler):
-    def __init__(self, agent_id=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.agent_id = agent_id
-        
-        # Ensure data directory exists
-        self.data_dir = Path("./data")
-        self.data_dir.mkdir(exist_ok=True)
-        
-    def emit(self, record):
-        # Format the log entry
-        log_entry = self.format(record)
-        
-        # Put in queue for streaming (existing functionality)
-        with log_lock:
-            log_queue.put(log_entry)
-        
-        # Save to file
-        try:
-            # Determine agent ID (from instance or try to parse from message)
-            agent_id = self.agent_id
-            if not agent_id and hasattr(record, 'msg'):
-                # Try to extract agent ID from message if it matches pattern
-                # This is a fallback and might need adjustment based on log format
-                msg = str(record.msg)
-                if "Agent " in msg and ":" in msg:
-                    agent_id = msg.split("Agent ")[1].split(":")[0].strip()
-            
-            agent_id = agent_id or "general"
-            
-            # Create directory structure
-            agent_dir = self.data_dir / agent_id
-            agent_dir.mkdir(exist_ok=True)
-            
-            logs_dir = agent_dir / "logs"
-            logs_dir.mkdir(exist_ok=True)
-            
-            # Get current date for log file naming
-            current_date = datetime.now().strftime("%Y-%m-%d")
-            log_file = logs_dir / f"{current_date}.log"
-            
-            # Append log entry to file
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(f"{log_entry}\n")
-                
-        except Exception as e:
-            # Don't let log saving errors propagate
-            print(f"Error saving log to file: {e}")
-
-
-# Add handlers to the browser_use logger
-browser_use_logger = logging.getLogger('browser_use')
-browser_use_logger.setLevel(logging.INFO)
-browser_use_logger.addHandler(LogHandler())
-browser_use_logger.addHandler(agent_file_handler)
 
 app = FastAPI()
 
@@ -151,22 +60,11 @@ app.add_middleware(
     allow_headers=['*'],  # Allows all headers
 )
 
-# Create directories if they don't exist
-STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
-os.makedirs(STATIC_DIR, exist_ok=True)
-
-# Import required modules for screenshot handling
-import base64
-from pathlib import Path
-import json
-
-# Define and create screenshots directory
-SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'screenshots')
-os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
 # Mount static directories
 app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
-app.mount('/screenshots', StaticFiles(directory=SCREENSHOTS_DIR), name='screenshots')
+#app.mount('/screenshots', StaticFiles(directory=SCREENSHOTS_DIR), name='screenshots')
+
 from pydantic import BaseModel
 
 class RunRequest(BaseModel):
@@ -182,22 +80,6 @@ def send_agent_history_step(data):
     response = requests.post(url, json=data)
     return response.json()
 
-def setup_agent_logger(agent_id):
-    """Create and configure a logger for a specific agent"""
-    # Create a logger with the agent's ID as the name
-    agent_logger = logging.getLogger(f'agent.{agent_id}')
-    agent_logger.setLevel(logging.INFO)
-    
-    # Create a log handler for this specific agent
-    agent_log_handler = LogHandler(agent_id=agent_id)
-    agent_log_handler.setFormatter(logging.Formatter('%(asctime)s - [%(name)s] - %(levelname)s - %(message)s'))
-    agent_logger.addHandler(agent_log_handler)
-    
-    # Also add the file handler for all agent logs
-    agent_logger.addHandler(agent_file_handler)
-    
-    return agent_logger
-
 
 # --- Action logger for browser actions as JSON ---
 def record_activity_after(agent_id: str):
@@ -205,7 +87,6 @@ def record_activity_after(agent_id: str):
     async def action_logger(agent):
         try:
             print(f'--- ON_STEP_END HOOK for agent {agent_id} ---')
-            setup_agent_logger(agent_id)
             # Get state and history objects
             state = agent.state
             history = state.history
@@ -218,12 +99,10 @@ def record_activity_after(agent_id: str):
             # Get the latest history entry
             last_entry = history.history[-1]
             step_number = len(history.history)
-            
-            # Log basic step info
-            browser_logger = logging.getLogger('browser_use')
+            logger = setup_agent_logger(agent_id)
             url = last_entry.state.url if hasattr(last_entry.state, "url") else "No URL"
             title = last_entry.state.title if hasattr(last_entry.state, "title") else "No title"
-            browser_logger.info(f"Step {step_number:03d} → {url} ({title!r})")
+            logger.info(f"Step {step_number:03d} → {url} ({title!r})")
             
             # Extract screenshot and handle streaming queue
             screenshot_data = None
@@ -359,6 +238,7 @@ async def run_agent(agent_id: str, request: RunRequest):
     Create (always fresh) and start an agent with the given query.
     """
     try:
+        set_current_agent_id(agent_id)
         start_time = time.time()
         # If an agent already exists, stop and remove it so we start fresh
         if agent_id in agent_manager.agents:
