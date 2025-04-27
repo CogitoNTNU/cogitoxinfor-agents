@@ -111,241 +111,89 @@ from pydantic import BaseModel
 class RunRequest(BaseModel):
     query: str
 
-
-class AgentManager:
-	def __init__(self):
-		self.agents: Dict[str, Dict[str, Any]] = {}
-		self.max_agents = 40  # Increased to 100 agents
-		self._lock = asyncio.Lock()
-		self.process = psutil.Process()
-		self.start_time = time.time()
-		logger.info(f'AgentManager initialized with max_agents={self.max_agents}')
-
-	async def create_agent(self, agent_id: str, task: str):
-		async with self._lock:
-			if len(self.agents) >= self.max_agents:
-				current_memory = self.process.memory_info().rss / 1024 / 1024  # MB
-				logger.error(f'Max agents reached. Current memory usage: {current_memory:.2f}MB')
-				raise ValueError(f'Maximum number of agents ({self.max_agents}) reached. Memory usage: {current_memory:.2f}MB')
-
-			if agent_id in self.agents:
-				logger.warning(f'Agent {agent_id} already exists')
-				raise ValueError(f'Agent {agent_id} already exists')
-
-			try:
-				llm = ChatOpenAI(model='gpt-4o-mini')
-				agent_instance = Agent(
-					task=task,
-					llm=llm,
-					register_new_step_callback=make_step_logger(agent_id)
-				)
-				agent = {
-					'instance': agent_instance,
-					'task': task,
-					'running': False,
-					'created_at': time.time(),
-					'last_active': time.time(),
-				}
-				self.agents[agent_id] = agent
-				logger.info(f'Created agent {agent_id}. Total agents: {len(self.agents)}')
-			except Exception as e:
-				logger.error(f'Failed to create agent {agent_id}: {str(e)}')
-				raise
-
-	def get_system_stats(self) -> dict:
-		stats = {
-			'total_agents': len(self.agents),
-			'memory_usage_mb': self.process.memory_info().rss / 1024 / 1024,
-			'cpu_percent': self.process.cpu_percent(),
-			'uptime_seconds': time.time() - self.start_time,
-			'thread_count': self.process.num_threads(),
-		}
-		logger.info(f'System stats: {stats}')
-		return stats
-
-	def get_agent(self, agent_id: str) -> Agent:
-		if agent_id not in self.agents:
-			raise ValueError(f'Agent {agent_id} not found')
-		return self.agents[agent_id]['instance']
-
-	def get_agent_status(self, agent_id: str):
-		if agent_id not in self.agents:
-			return 'not_created'
-
-		try:
-			agent_data = self.agents[agent_id]
-			agent = agent_data['instance']
-
-			if hasattr(agent, '_stopped') and agent._stopped:
-				return 'stopped'
-			elif hasattr(agent, '_paused') and agent._paused:
-				return 'paused'
-			elif agent_data.get('running', False):
-				return 'running'
-			return 'ready'
-		except Exception as e:
-			logger.error(f"Error checking agent status: {str(e)}")
-			return 'error'
-
-	def set_running(self, agent_id: str, value: bool):
-		if agent_id in self.agents:
-			self.agents[agent_id]['running'] = value
-
-	def list_agents(self):
-		return {
-			agent_id: {'task': data['task'], 'status': self.get_agent_status(agent_id)} for agent_id, data in self.agents.items()
-		}
-		
-	def save_agent_screenshot(self, agent_id: str, screenshot_data: str, step_number: int = None) -> str:
-		"""Save a screenshot to disk and return the URL path"""
-		# Create agent-specific directory
-		agent_dir = Path(SCREENSHOTS_DIR) / agent_id
-		agent_dir.mkdir(exist_ok=True)
-		
-		# Generate filename
-		timestamp = time.strftime("%Y%m%d-%H%M%S")
-		step_info = f"_step{step_number}" if step_number is not None else ""
-		filename = f"{timestamp}{step_info}.png"
-		filepath = agent_dir / filename
-		
-		if b64_to_png(screenshot_data, filepath):
-			# Return the URL path that can be used by the frontend
-			return f"/screenshots/{agent_id}/{filename}"
-		return None
-
-	def save_agent_history(self, agent_id: str, task: str):
-		"""Save agent history to a file"""
-		try:
-			if agent_id not in self.agents:
-				logger.warning(f"Cannot save history: Agent {agent_id} not found")
-				return
-				
-			agent = self.agents[agent_id]['instance']
-			
-			# Make sure agent has history attribute
-			if not hasattr(agent, "history") or not agent.history:
-				logger.warning(f"Agent {agent_id} has no history to save")
-				return
-				
-			# Create safe filename from agent_id and task (first 30 chars)
-			safe_task = "".join(c if c.isalnum() else "_" for c in task[:30])
-			filename = f"logs_{agent_id}_{safe_task}.txt"
-			filepath = os.path.join(LOGS_DIR, filename)
-			
-			# Extract history components if available
-			history = agent.history
-			
-			with open(filepath, "w", encoding="utf-8") as log_file:
-				log_file.write(f"Agent ID: {agent_id}\n")
-				log_file.write(f"Task: {task}\n")
-				log_file.write(f"Run completed at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-				
-				# Handle history methods similar to the example code
-				if hasattr(history, "urls") and callable(history.urls):
-					log_file.write("Visited URLs: " + str(history.urls()) + "\n")
-				
-				if hasattr(history, "screenshots") and callable(history.screenshots):
-					log_file.write("Screenshots: " + str(history.screenshots()) + "\n")
-					
-				if hasattr(history, "action_names") and callable(history.action_names):
-					log_file.write("Action names: " + str(history.action_names()) + "\n")
-					
-				if hasattr(history, "extracted_content") and callable(history.extracted_content):
-					log_file.write("Extracted content: " + str(history.extracted_content()) + "\n")
-					
-				if hasattr(history, "errors") and callable(history.errors):
-					log_file.write("Errors: " + str(history.errors()) + "\n")
-					
-				if hasattr(history, "model_actions") and callable(history.model_actions):
-					log_file.write("Model actions: " + str(history.model_actions()) + "\n")
-				
-				# Also store raw history steps if available
-				if hasattr(history, "history"):
-					log_file.write("\n---- Detailed History Steps ----\n")
-					for i, step in enumerate(history.history):
-						log_file.write(f"\nStep {i}:\n")
-						log_file.write(f"URL: {step.state.url if hasattr(step.state, 'url') else 'N/A'}\n")
-						log_file.write(f"Title: {step.state.title if hasattr(step.state, 'title') else 'N/A'}\n")
-						
-						# Include goal if available
-						if hasattr(step, "model_output") and step.model_output and hasattr(step.model_output.current_state, "next_goal"):
-							log_file.write(f"Goal: {step.model_output.current_state.next_goal}\n")
-				
-			logger.info(f"Saved agent {agent_id} history to {filepath}")
-			return filepath
-			
-		except Exception as e:
-			logger.error(f"Error saving history for agent {agent_id}: {str(e)}")
-			return None
-
-
-
+from agent_manager import AgentManager
 # Create a singleton instance
 agent_manager = AgentManager()
 
-# Add near the top of the file with other directory creation
-def b64_to_png(base64_str: str, output_path: Path) -> bool:
-    """Convert base64 string to PNG file"""
-    try:
-        img_data = base64.b64decode(base64_str)
-        with open(output_path, 'wb') as f:
-            f.write(img_data)
-        logger.info(f"Saved screenshot to {output_path}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to save screenshot: {str(e)}")
-        return False
-
-def make_step_logger(agent_id: str):
-    """Returns a callback that logs each step and saves its screenshot."""
-    def step_logger(state, output, step_number):
-        # 1) Log URL/title
-        logger = logging.getLogger('browser_use')
-        logger.info(f"Step {step_number:03d} → {state.url} ({state.title!r})")
-        # 2) Persist screenshot if present
-        if state.screenshot:
-            agent_dir = Path(SCREENSHOTS_DIR) / agent_id
-            agent_dir.mkdir(parents=True, exist_ok=True)
-            img = base64.b64decode(state.screenshot)
-            path = agent_dir / f"step_{step_number:03d}.png"
-            with open(path, 'wb') as f:
-                f.write(img)
-            # Also enqueue screenshot for live streaming
-            if state.screenshot: # Ensure screenshot data exists
-                with screenshot_lock:
-                    screenshot_queue.put({
-                        "agent_id": agent_id,
-                        "step": step_number,
-                        "data": state.screenshot # Send raw screenshot data as received
-                    })
-    return step_logger
 
 # --- Action logger for browser actions as JSON ---
-def make_action_logger(agent_id: str):
+def record_activity_after(agent_id: str):
     """Returns an async callback that logs each action as JSON to logs/browser_actions.log."""
     async def action_logger(agent):
-        history = agent.state.history
-        if history.history:
-            last = history.history[-1]
-            result = last.result[-1]
-            # Build full action payloads list
-            actions = [a.model_dump(exclude_none=True) for a in last.model_output.action]
-            # Retrieve agent brain state
-            brain = last.model_output.current_state
-            # Construct enriched log record
-            record = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "step": len(history.history),
-                "url": last.state.url,
-                "memory": brain.memory,
-                "next_goal": brain.next_goal,
-                "actions": actions,
-                "success": result.error is None,
-                "error": result.error
-            }
-            log_path = os.path.join(LOGS_DIR, 'browser_actions.log')
-            with open(log_path, 'a', encoding='utf-8') as f:
-                f.write(json.dumps(record) + '\n')
+        try:
+            # Get state and history objects
+            state = agent.state
+            history = state.history
+            
+            # Skip if no history or empty history
+            if not history or not history.history:
+                logger.warning(f"Agent {agent_id}: No history available")
+                return
+                
+            # Get the latest history entry
+            last_entry = history.history[-1]
+            step_number = len(history.history)
+            
+            # Log step info (URL/title)
+            browser_logger = logging.getLogger('browser_use')
+            url = last_entry.state.url if hasattr(last_entry.state, "url") else "No URL"
+            title = last_entry.state.title if hasattr(last_entry.state, "title") else "No title"
+            browser_logger.info(f"Step {step_number:03d} → {url} ({title!r})")
+            
+            # Handle screenshot (if present)
+            screenshot_data = None
+            if hasattr(last_entry.state, "screenshot"):
+                screenshot_data = last_entry.state.screenshot
+                
+                if screenshot_data:
+                    # Save screenshot to file
+                    agent_dir = Path(SCREENSHOTS_DIR) / agent_id
+                    agent_dir.mkdir(parents=True, exist_ok=True)
+                    img = base64.b64decode(screenshot_data)
+                    path = agent_dir / f"step_{step_number:03d}.png"
+                    with open(path, 'wb') as f:
+                        f.write(img)
+                    
+                    # Add to streaming queue
+                    with screenshot_lock:
+                        screenshot_queue.put({
+                            "agent_id": agent_id,
+                            "step": step_number,
+                            "data": screenshot_data
+                        })
+            
+            # Record action information (similar to record_activity_after)
+            if hasattr(last_entry, "model_output") and last_entry.model_output:
+                result = last_entry.result[-1] if last_entry.result else None
+                
+                # Build action payloads
+                actions = []
+                if hasattr(last_entry.model_output, "action"):
+                    actions = [a.model_dump(exclude_none=True) for a in last_entry.model_output.action]
+                
+                # Get brain state
+                brain = last_entry.model_output.current_state if hasattr(last_entry.model_output, "current_state") else None
+                
+                # Construct log record (safely check for attributes)
+                record = {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "step": step_number,
+                    "url": url,
+                    "memory": brain.memory if brain and hasattr(brain, "memory") else None,
+                    "next_goal": brain.next_goal if brain and hasattr(brain, "next_goal") else None,
+                    "actions": actions,
+                    "success": result.error is None if result else False,
+                    "error": result.error if result else None
+                }
+                
+                # Write to log file
+                log_path = os.path.join(LOGS_DIR, 'browser_actions.log')
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(record) + '\n')
+                    
+        except Exception as e:
+            # Robust exception handling
+            logger.error(f"Error in unified callback: {str(e)}", exc_info=True)
     return action_logger
 
 def send_agent_history_step(data):
@@ -466,22 +314,9 @@ async def run_agent(agent_id: str, request: RunRequest):
         # Kick off the browser‐automation in the background
         task = asyncio.create_task(
             agent.run(
-                on_step_end=make_action_logger(agent_id),
+                on_step_end=record_activity_after(agent_id),
                 on_step_start=record_activity_before,
                 ))
-
-        # Add completion callback for debugging
-        def done_callback(future):
-            try:
-                result = future.result()
-                # Save history after agent completes (this saves more than just actions)
-                agent_manager.save_agent_history(agent_id, request.query)
-            except Exception as e:
-                logger.error(f'Agent {agent_id} failed: {str(e)}')
-            finally:
-                agent_manager.set_running(agent_id, False)
-
-        task.add_done_callback(done_callback)
 
         setup_time = time.time() - start_time
         return {
@@ -526,11 +361,6 @@ async def stop_agent(agent_id: str):
     try:
         agent = agent_manager.get_agent(agent_id)
         
-        # Save the history BEFORE stopping the agent
-        if agent_id in agent_manager.agents:
-            task = agent_manager.agents[agent_id]['task'] 
-            agent_manager.save_agent_history(agent_id, task)
-        
         # Now stop the agent
         agent.stop()
         agent_manager.set_running(agent_id, False)
@@ -564,44 +394,6 @@ async def create_agent():
     # Create the agent with an empty initial task
     await agent_manager.create_agent(new_id, "")
     return {"agent_id": new_id}
-
-@app.get('/agent/{agent_id}/screenshot')
-async def get_agent_screenshot(agent_id: str, step: Optional[int] = None, save: bool = True):
-    """Get the latest screenshot or a specific step's screenshot"""
-    try:
-        agent = agent_manager.get_agent(agent_id)
-        
-        # If agent has history
-        if hasattr(agent, "history") and agent.history and agent.history.history:
-            # If step is provided, get that specific step's screenshot
-            if step is not None and 0 <= step < len(agent.history.history):
-                screenshot_data = agent.history.history[step].state.screenshot
-                step_num = step
-            else:
-                # Otherwise return the latest screenshot
-                screenshot_data = agent.history.history[-1].state.screenshot
-                step_num = len(agent.history.history) - 1
-                
-            if screenshot_data and save:
-                agent_manager.save_agent_screenshot(agent_id, screenshot_data, step_num)
-                
-            if screenshot_data:
-                return {"screenshot": screenshot_data, "step": step_num}
-        
-        # If we can't get a screenshot from history, try to take a new one
-        # FIXED: Removed the use_vision parameter
-        current_state = await agent.browser_context.get_state()
-        if current_state and current_state.screenshot:
-            screenshot_data = current_state.screenshot
-            if save:
-                agent_manager.save_agent_screenshot(agent_id, screenshot_data)
-            return {"screenshot": screenshot_data, "step": -1}
-            
-        raise HTTPException(status_code=404, detail="No screenshot available")
-    except Exception as e:
-        logger.error(f"Error getting screenshot for {agent_id}: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-
             
 @app.get('/agent/{agent_id}/history')
 async def get_agent_history(agent_id: str, save_screenshots: bool = True):
@@ -655,28 +447,6 @@ async def get_agent_history(agent_id: str, save_screenshots: bool = True):
     except Exception as e:
         logger.error(f"Error getting history for {agent_id}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get('/logs')
-async def event_stream():
-    async def generate():
-        while True:
-            # Logs
-            if not log_queue.empty():
-                with log_lock:
-                    while not log_queue.empty():
-                        log_entry = log_queue.get()
-                        yield {'event': 'log', 'data': log_entry}
-            # Screenshots
-            if not screenshot_queue.empty():
-                with screenshot_lock:
-                    while not screenshot_queue.empty():
-                        msg = screenshot_queue.get()
-                        # Send screenshot payload as JSON string
-                        yield {'event': 'screenshot', 'data': json.dumps(msg)}
-            await asyncio.sleep(0.1)
-
-    return EventSourceResponse(generate())
 
 
 # Per-agent SSE stream endpoint

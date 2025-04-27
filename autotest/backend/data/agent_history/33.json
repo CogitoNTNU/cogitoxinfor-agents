@@ -1,0 +1,15 @@
+{
+  "website_html": null,
+  "website_screenshot": null,
+  "url": "https://www.google.com/search?q=python&sca_esv=0dfcf34fe0d74fa0&source=hp&ei=bVsOaPLoG7TMwPAPq86GiA0&iflsig=ACkRmUkAAAAAaA5pfQbhMvAjPTilABe4s9bpMbjk8FtE&ved=0ahUKEwiy08uU0fiMAxU0JhAIHSunAdEQ4dUDCA4&oq=python&gs_lp=Egdnd3Mtd2l6IgZweXRob24yCBAAGIAEGLEDMggQABiABBixAzIFEAAYgAQyBRAAGIAEMgUQABiABDIFEAAYgAQyCBAuGIAEGNQCMgUQABiABDIFEAAYgAQyBRAAGIAESK9AUABYAHAAeACQAQCYAUCgAUCqAQExuAEMyAEA-AEBmAIBoAJNmAMAkgcBMaAHuQayBwExuAdN&sclient=gws-wiz&sei=hFsOaK3HPIa9wPAPvKfm-QE",
+  "model_thoughts": "<circular reference>",
+  "model_outputs": "<circular reference>",
+  "model_actions": {
+    "extract_content": {
+      "goal": "Retrieve the first search result for 'python'.",
+      "should_strip_link_urls": false
+    },
+    "interacted_element": null
+  },
+  "extracted_content": "\ud83d\udcc4  Extracted from page\n: ```json\n{\n  \"first_search_result\": {\n    \"title\": \"Welcome to Python.org\",\n    \"link\": \"https://www.python.org\",\n    \"description\": \"Python is a programming language that is easy to learn and use. Whether you're a beginner or an experienced developer, it's straightforward to get started.\",\n    \"additional_info\": {\n      \"downloads_link\": \"https://www.python.org/downloads/\",\n      \"beginner_guide\": \"https://www.python.org/about/gettingstarted/\",\n      \"documentation\": \"https://docs.python.org/\"\n    }\n  }\n}\n```\n"
+}

@@ -1,0 +1,11 @@
+{
+  "website_html": null,
+  "website_screenshot": null,
+  "url": "https://www.google.com/",
+  "model_thoughts": "<circular reference>",
+  "model_outputs": "<circular reference>",
+  "model_actions": {
+    "interacted_element": null
+  },
+  "extracted_content": "\ud83d\udd17  Navigated to https://www.google.com"
+}
