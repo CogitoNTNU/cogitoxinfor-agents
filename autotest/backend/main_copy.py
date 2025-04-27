@@ -8,9 +8,10 @@ from threading import Lock
 from typing import Any, Dict, Optional
 import json
 from datetime import datetime, timezone
+import uuid
 
 import psutil
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -95,10 +96,10 @@ os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 # Mount static directories
 app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
 app.mount('/screenshots', StaticFiles(directory=SCREENSHOTS_DIR), name='screenshots')
+from pydantic import BaseModel
 
-class TaskRequest(BaseModel):
-    agent_id: str
-    task: str
+class RunRequest(BaseModel):
+    query: str
 
 
 class AgentManager:
@@ -342,19 +343,30 @@ async def read_root():
 	return FileResponse(os.path.join(STATIC_DIR, 'index.html'))
 
 
-@app.post('/agent/run')
-async def run_agent(request: TaskRequest):
+@app.post('/agent/{agent_id}/run')
+async def run_agent(agent_id: str, request: RunRequest):
+    """
+    Create (always fresh) and start an agent with the given query.
+    """
     try:
         start_time = time.time()
-        if request.agent_id not in agent_manager.agents:
-            await agent_manager.create_agent(request.agent_id, request.task)
+        # If an agent already exists, stop and remove it so we start fresh
+        if agent_id in agent_manager.agents:
+            try:
+                agent_manager.get_agent(agent_id).stop()
+            except Exception:
+                pass
+            agent_manager.agents.pop(agent_id)
 
-        agent = agent_manager.get_agent(request.agent_id)
-        agent_manager.set_running(request.agent_id, True)
+        # Create a brand-new agent with this query
+        await agent_manager.create_agent(agent_id, request.query)
 
-        # Run in background task to not block, and log browser actions as JSON
+        agent = agent_manager.get_agent(agent_id)
+        agent_manager.set_running(agent_id, True)
+
+        # Kick off the browser‐automation in the background
         task = asyncio.create_task(
-            agent.run(on_step_end=make_action_logger(request.agent_id))
+            agent.run(on_step_end=make_action_logger(agent_id))
         )
 
         # Add completion callback for debugging
@@ -362,24 +374,24 @@ async def run_agent(request: TaskRequest):
             try:
                 result = future.result()
                 # Save history after agent completes (this saves more than just actions)
-                agent_manager.save_agent_history(request.agent_id, request.task)
+                agent_manager.save_agent_history(agent_id, request.query)
             except Exception as e:
-                logger.error(f'Agent {request.agent_id} failed: {str(e)}')
+                logger.error(f'Agent {agent_id} failed: {str(e)}')
             finally:
-                agent_manager.set_running(request.agent_id, False)
+                agent_manager.set_running(agent_id, False)
 
         task.add_done_callback(done_callback)
 
         setup_time = time.time() - start_time
         return {
             'status': 'running',
-            'agent_id': request.agent_id,
-            'task': request.task,
+            'agent_id': agent_id,
+            'query': request.query,
             'setup_time_ms': setup_time * 1000,
             'total_agents': len(agent_manager.agents),
         }
     except Exception as e:
-        logger.error(f'Error running agent {request.agent_id}: {str(e)}')
+        logger.error(f'Error running agent {agent_id}: {str(e)}')
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -437,9 +449,22 @@ async def get_agent_status(agent_id: str):
 		raise HTTPException(status_code=400, detail=str(e))
 
 
+
 @app.get('/agents')
 async def list_agents():
+	"""Return a dict of {agent_id: {task, status}}."""
 	return agent_manager.list_agents()
+
+
+# Create a new agent and register it without running
+@app.post('/agent')
+async def create_agent():
+    """Create a new agent and register it without running."""
+    # Generate a unique agent ID
+    new_id = str(uuid.uuid4())
+    # Create the agent with an empty initial task
+    await agent_manager.create_agent(new_id, "")
+    return {"agent_id": new_id}
 
 @app.get('/agent/{agent_id}/screenshot')
 async def get_agent_screenshot(agent_id: str, step: Optional[int] = None, save: bool = True):
@@ -532,6 +557,7 @@ async def get_agent_history(agent_id: str, save_screenshots: bool = True):
         logger.error(f"Error getting history for {agent_id}: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 
+
 @app.get('/logs')
 async def event_stream():
     async def generate():
@@ -552,6 +578,38 @@ async def event_stream():
             await asyncio.sleep(0.1)
 
     return EventSourceResponse(generate())
+
+
+# Per-agent SSE stream endpoint
+@app.get('/agent/{agent_id}/stream')
+async def agent_stream(request: Request, agent_id: str):
+    """
+    SSE stream of logs and screenshots filtered by agent_id.
+    """
+    async def event_generator():
+        while True:
+            # If client disconnects, stop the loop
+            if await request.is_disconnected():
+                break
+
+            # Stream log entries
+            if not log_queue.empty():
+                with log_lock:
+                    while not log_queue.empty():
+                        log_entry = log_queue.get()
+                        yield {'event': 'log', 'data': log_entry}
+
+            # Stream screenshot entries for this agent
+            if not screenshot_queue.empty():
+                with screenshot_lock:
+                    while not screenshot_queue.empty():
+                        msg = screenshot_queue.get()
+                        if msg.get('agent_id') == agent_id:
+                            yield {'event': 'screenshot', 'data': json.dumps(msg)}
+
+            await asyncio.sleep(0.1)
+
+    return EventSourceResponse(event_generator())
 
 
 @app.get('/system/stats')

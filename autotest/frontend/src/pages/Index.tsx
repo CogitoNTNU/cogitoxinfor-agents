@@ -8,7 +8,8 @@ import { agentApi } from '../services/api';
 import AgentController from '../components/AgentController';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'; // Keep Card components for layout
 // Removed ConfigModal import
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../components/ui/resizable';
+import AgentSidebar from '../components/AgentSidebar';
+import { SidebarProvider } from "@/components/ui/sidebar";
 // Removed Tabs, TabsContent, TabsList, TabsTrigger imports
 // Removed ToolCalls, ToolResult imports
 import { Button } from '../components/ui/button'; // Keep Button for Clear Logs/Screenshots
@@ -22,63 +23,65 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ agentId }) => {
   const { logs, screenshots, isRunning } = useAgentStream(agentId);
 
   return (
-    <div key={agentId} className="mb-8">
-      <h3 className="font-bold mb-2">Agent {agentId}</h3>
-      <LogDisplay
-        logs={logs}
-        isRunning={isRunning}
-        actionHistory={[]} // or derive via history call
-        onClear={() => {}}
-      />
-      <ScreenshotDisplay
-        screenshots={screenshots.map((data, idx) => ({
-          id: `${agentId}-${idx}`,
-          url: `data:image/png;base64,${data}`
-        }))}
-        onClearScreenshots={() => {}}
-        loading={isRunning && screenshots.length === 0}
-      />
+    <div className="flex flex-1 overflow-hidden">
+      {/* Left: logs and chat */}
+      <div className="w-1/3 flex flex-col h-full pr-4">
+        <h3 className="font-bold mb-2">Log</h3>
+        <div className="flex-1 overflow-auto mb-4">
+          <LogDisplay
+            logs={logs}
+            isRunning={isRunning}
+            actionHistory={[]}
+            onClear={() => {}}
+          />
+        </div>
+        <div className="flex-shrink-0">
+          <AgentController />
+        </div>
+      </div>
+      {/* Right: screenshots */}
+      <div className="w-2/3 flex flex-col h-full pl-4">
+        <h3 className="font-bold mb-2">Screenshots</h3>
+        <div className="flex-1 overflow-visible">
+          <ScreenshotDisplay
+            screenshots={screenshots.map((data, idx) => ({
+              id: `${agentId}-${idx}`,
+              url: `data:image/png;base64,${data}`,
+            }))}
+            onClearScreenshots={() => {}}
+            loading={isRunning && screenshots.length === 0}
+          />
+        </div>
+      </div>
     </div>
   );
 };
 
 const AgentApp: React.FC = () => {
-  const { agentIds, runAgent } = useAgent();
+  const { currentAgentId } = useAgent();
 
   return (
-    <div className="container mx-auto py-6 h-[calc(100vh-3rem)]">
+    <div className="container mx-auto py-6 h-[calc(100vh-3rem)] flex flex-col">
       <header className="text-center mb-4">
         <h1 className="text-3xl font-bold">Cogito x Infor Autotester</h1>
         <p className="text-muted-foreground">
           Visualize and interact with your web agent
         </p>
       </header>
-
-      <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-12rem)]">
-        <ResizablePanel defaultSize={33} minSize={25}>
-          <div className="h-full pr-2 flex flex-col">
-            {/* Agent Controller - unchanged */}
-            <div className="flex-shrink-0 mb-4">
-              {/* No props passed to AgentController as it uses useAgent */}
-              <AgentController />
-            </div>
-            <div className="mb-4 flex-grow overflow-auto space-y-6">
-              {agentIds.map(agentId => (
-                <AgentPanel key={agentId} agentId={agentId} />
-              ))}
-            </div>
+      <div className="flex flex-1 overflow-hidden">
+        <AgentSidebar />
+        <div className="flex-1 flex flex-col overflow-auto pl-4">
+          <div className="flex-1 overflow-auto">
+            {currentAgentId ? (
+              <AgentPanel agentId={currentAgentId} />
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                Select or create a chat
+              </div>
+            )}
           </div>
-        </ResizablePanel>
-
-        <ResizableHandle withHandle />
-
-      </ResizablePanelGroup>
-
-      {/* Removed unnecessary components */}
-      {/* <ConversationDrawer /> */}
-      {/* <InterruptDialog /> */}
-      {/* <ConfigModal open={false} onOpenChange={() => {}} /> */}
-      {/* Removed other potentially unnecessary components like Sidebar, ToolDisplay */}
+        </div>
+      </div>
     </div>
   );
 };
@@ -86,7 +89,9 @@ const AgentApp: React.FC = () => {
 const Index: React.FC = () => {
   return (
     <AgentProvider> {/* Wrap AgentApp with AgentProvider */}
-      <AgentApp />
+      <SidebarProvider>
+        <AgentApp />
+      </SidebarProvider>
     </AgentProvider>
   );
 };

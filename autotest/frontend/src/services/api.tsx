@@ -3,9 +3,13 @@ import axios from 'axios';
 export const API_URL = 'http://localhost:8000';
 
 export const agentApi = {
-  // Create and run an agent
-  runAgent: (agentId: string, task: string) => 
-    axios.post(`${API_URL}/agent/run`, { agent_id: agentId, task }),
+  // Create a new agent
+  createAgent: () =>
+    axios.post(`${API_URL}/agent`),
+
+  // Run an existing agent
+  runAgent: (agentId: string, query: string) =>
+    axios.post(`${API_URL}/agent/${agentId}/run`, { query }),
   
   // Get agent status
   getAgentStatus: (agentId: string) => 
@@ -39,6 +43,7 @@ export const agentApi = {
   getAgentHistory: (agentId: string) => 
     axios.get(`${API_URL}/agent/${agentId}/history`),
 
-  // Stream real-time logs and screenshots via Server-Sent Events
-  streamAgentEvents: (): EventSource => new EventSource(`${API_URL}/logs`),
+  // Stream real-time logs and screenshots for a specific agent via SSE
+  streamAgentEvents: (agentId: string): EventSource =>
+    new EventSource(`${API_URL}/agent/${agentId}/stream`),
 };

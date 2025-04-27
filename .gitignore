@@ -10,6 +10,8 @@ __pycache__/
 
 history/
 
+screenshots/
+
 # Distribution / packaging
 .Python
 build/
