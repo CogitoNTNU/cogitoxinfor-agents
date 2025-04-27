@@ -82,12 +82,56 @@ log_lock = Lock()
 screenshot_queue = Queue()
 screenshot_lock = Lock()
 
+from pathlib import Path
 
 class LogHandler(logging.Handler):
-	def emit(self, record):
-		log_entry = self.format(record)
-		with log_lock:
-			log_queue.put(log_entry)
+    def __init__(self, agent_id=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.agent_id = agent_id
+        
+        # Ensure data directory exists
+        self.data_dir = Path("./data")
+        self.data_dir.mkdir(exist_ok=True)
+        
+    def emit(self, record):
+        # Format the log entry
+        log_entry = self.format(record)
+        
+        # Put in queue for streaming (existing functionality)
+        with log_lock:
+            log_queue.put(log_entry)
+        
+        # Save to file
+        try:
+            # Determine agent ID (from instance or try to parse from message)
+            agent_id = self.agent_id
+            if not agent_id and hasattr(record, 'msg'):
+                # Try to extract agent ID from message if it matches pattern
+                # This is a fallback and might need adjustment based on log format
+                msg = str(record.msg)
+                if "Agent " in msg and ":" in msg:
+                    agent_id = msg.split("Agent ")[1].split(":")[0].strip()
+            
+            agent_id = agent_id or "general"
+            
+            # Create directory structure
+            agent_dir = self.data_dir / agent_id
+            agent_dir.mkdir(exist_ok=True)
+            
+            logs_dir = agent_dir / "logs"
+            logs_dir.mkdir(exist_ok=True)
+            
+            # Get current date for log file naming
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            log_file = logs_dir / f"{current_date}.log"
+            
+            # Append log entry to file
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(f"{log_entry}\n")
+                
+        except Exception as e:
+            # Don't let log saving errors propagate
+            print(f"Error saving log to file: {e}")
 
 
 # Add handlers to the browser_use logger
@@ -138,6 +182,22 @@ def send_agent_history_step(data):
     response = requests.post(url, json=data)
     return response.json()
 
+def setup_agent_logger(agent_id):
+    """Create and configure a logger for a specific agent"""
+    # Create a logger with the agent's ID as the name
+    agent_logger = logging.getLogger(f'agent.{agent_id}')
+    agent_logger.setLevel(logging.INFO)
+    
+    # Create a log handler for this specific agent
+    agent_log_handler = LogHandler(agent_id=agent_id)
+    agent_log_handler.setFormatter(logging.Formatter('%(asctime)s - [%(name)s] - %(levelname)s - %(message)s'))
+    agent_logger.addHandler(agent_log_handler)
+    
+    # Also add the file handler for all agent logs
+    agent_logger.addHandler(agent_file_handler)
+    
+    return agent_logger
+
 
 # --- Action logger for browser actions as JSON ---
 def record_activity_after(agent_id: str):
@@ -145,7 +205,7 @@ def record_activity_after(agent_id: str):
     async def action_logger(agent):
         try:
             print(f'--- ON_STEP_END HOOK for agent {agent_id} ---')
-            
+            setup_agent_logger(agent_id)
             # Get state and history objects
             state = agent.state
             history = state.history
