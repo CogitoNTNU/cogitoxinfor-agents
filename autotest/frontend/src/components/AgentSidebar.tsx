@@ -13,13 +13,14 @@ import {
 import { Plus, MessageSquare } from "lucide-react";
 import { useAgent } from "../context/AgentContext";
 import { agentApi } from "@/services/api.tsx";
+import { useSidebar } from "@/components/ui/sidebar";
 
 export const AgentSidebar: React.FC = () => {
+  const { state } = useSidebar();
   const {
     agentIds,
     currentAgentId,
     setCurrentAgentId,
-    runAgent,
   } = useAgent();
 
   const handleNewChat = async () => {
@@ -30,7 +31,12 @@ export const AgentSidebar: React.FC = () => {
   };
 
   return (
-    <Sidebar side="left" variant="sidebar" collapsible="icon">
+    <Sidebar
+        side="left"
+        variant="sidebar"
+        collapsible="icon"
+        className="w-12 hover:w-64 transition-all duration-200 ease-in-out"
+      >
       <SidebarHeader>
         <SidebarMenuButton asChild tooltip="New Chat">
           <button onClick={handleNewChat}>
@@ -39,26 +45,24 @@ export const AgentSidebar: React.FC = () => {
           </button>
         </SidebarMenuButton>
       </SidebarHeader>
-      <SidebarSeparator />
+      <SidebarSeparator className="mb-2"/>
       <SidebarContent>
         <SidebarMenu>
           {agentIds.map((id, idx) => (
-            <SidebarMenuItem key={`${id}-${idx}`}>
+            <SidebarMenuItem key={`${id}-${idx}`}
+              className="mx-2">
               <SidebarMenuButton
                 isActive={currentAgentId === id}
                 onClick={() => setCurrentAgentId(id)}
                 tooltip={`Agent ${id}`}
               >
                 <MessageSquare />
-                <span>{id}</span>
+                <span className={state === "collapsed" ? "hidden" : ""}>{id}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarTrigger />
-      </SidebarFooter>
     </Sidebar>
   );
 };

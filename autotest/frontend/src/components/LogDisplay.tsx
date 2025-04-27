@@ -5,8 +5,6 @@ import { ScrollArea } from './ui/scroll-area';
 import { format } from 'date-fns';
 import { Trash2, Image, Code, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-// Removed useAgent import
 
 interface LogEntry {
   id: string;
@@ -30,8 +28,6 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
   isRunning, // isRunning is now a prop
   actionHistory // actionHistory is now a prop
 }) => {
-  // Removed useAgent hook usage
-  const [activeTab, setActiveTab] = useState('logs');
   const scrollAreaRef = useRef<HTMLDivElement>(null); // Ref for the scrollable area
 
   // Auto-scroll the log view to the bottom on new logs
@@ -63,19 +59,9 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
 
   return (
     <Card className={cn("w-full", className)}>
-      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-        {logs.length > 0 && (
-          <Button variant="outline" size="sm" onClick={onClear}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            Clear Logs
-          </Button>
-        )}
-      </CardHeader>
-
-      <CardContent className="p-4">
-
+        <CardContent className="p-4">
           {/* Regular logs tab content */}
-            <ScrollArea className="h-[300px] pr-4" ref={scrollAreaRef}> {/* Attach ref to ScrollArea */}
+            <ScrollArea className="h-[400px] pr-4" ref={scrollAreaRef}> {/* Attach ref to ScrollArea */}
               {logs.length === 0 && isRunning ? (
                  actionHistory && actionHistory.length > 0 ? ( // Keep actionHistory display if it's passed as a prop
                   <div className="space-y-2">
