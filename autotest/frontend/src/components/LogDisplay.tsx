@@ -61,7 +61,7 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
     <Card className={cn("w-full", className)}>
         <CardContent className="p-4">
           {/* Regular logs tab content */}
-            <ScrollArea className="h-[400px] pr-4" ref={scrollAreaRef}> {/* Attach ref to ScrollArea */}
+            <ScrollArea className="h-[320px] pr-4" ref={scrollAreaRef}> {/* Attach ref to ScrollArea */}
               {logs.length === 0 && isRunning ? (
                  actionHistory && actionHistory.length > 0 ? ( // Keep actionHistory display if it's passed as a prop
                   <div className="space-y-2">
@@ -86,7 +86,7 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-full border border-dashed rounded-md">
-                    <p className="text-muted-foreground">Agent Running...</p>
+                    <p className="text-muted-foreground">Agent waiting for task...</p>
                   </div>
                 )
               ) : logs.length === 0 ? (
