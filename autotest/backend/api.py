@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from fastapi import FastAPI, Request
 import uvicorn
+from datetime import datetime
 
 # Import centralized logging
 from logging_setup import get_logger, b64_to_png, DATA_DIR
@@ -71,7 +72,6 @@ async def post_agent_history_step(request: Request):
 
     # Extract the screenshot and HTML before saving the main JSON
     website_screenshot = data.get("website_screenshot")
-    website_html = data.get("website_html")
     
     # Remove large fields from the JSON before saving
     clean_data = {**data}
@@ -96,6 +96,37 @@ async def post_agent_history_step(request: Request):
         "message": f"Saved to {file_path}",
         "file_id": file_name,
         "event_type": event_type,
+        "agent_id": agent_id
+    }
+
+@app.post("/save_log")
+async def save_log(request: Request):
+    data = await request.json()
+    
+    agent_id = data.get("agent_id", "general")
+    log_entry = data.get("log_entry")
+    
+    logger.info(f"Saving log for agent {agent_id}")
+    
+    # Create agent-specific directory
+    agent_dir = Path(DATA_DIR) / agent_id
+    agent_dir.mkdir(exist_ok=True)
+    
+    # Create logs directory
+    logs_dir = agent_dir / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    
+    # Get current date for log file naming
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    log_file = logs_dir / f"{current_date}.log"
+    
+    # Append log entry to file
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(f"{log_entry}\n")
+        
+    return {
+        "status": "ok",
+        "message": f"Log saved for agent {agent_id}",
         "agent_id": agent_id
     }
 

@@ -2,11 +2,12 @@ import os
 import base64
 import logging
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 from queue import Queue
 from threading import Lock
 from datetime import datetime
 import threading
+import requests
+from pathlib import Path
 
 # Create global queues for real-time messages
 log_queue = Queue()
@@ -48,9 +49,6 @@ class LogHandler(logging.Handler):
         super().__init__(*args, **kwargs)
         self.agent_id = agent_id
         
-        # Ensure data directory exists
-        self.data_dir = Path(DATA_DIR)
-        
     def emit(self, record):
         # Format the log entry
         log_entry = self.format(record)
@@ -59,50 +57,43 @@ class LogHandler(logging.Handler):
         with log_lock:
             log_queue.put(log_entry)
         
-        # Save to file
+        # Determine agent ID (check multiple sources in priority order)
+        agent_id = None
+        
+        # 1. Check if record has agent_id attribute (added by filter)
+        if hasattr(record, 'agent_id'):
+            agent_id = record.agent_id
+        
+        # 2. Use handler's agent_id if set
+        if not agent_id and self.agent_id:
+            agent_id = self.agent_id
+        
+        # 3. Check thread-local storage
+        if not agent_id:
+            agent_id = get_current_agent_id()
+        
+        # 4. Try to extract from message as last resort
+        if not agent_id and hasattr(record, 'msg'):
+            msg = str(record.msg)
+            if "Agent " in msg and ":" in msg:
+                agent_id = msg.split("Agent ")[1].split(":")[0].strip()
+        
+        # Fall back to general if all else fails
+        agent_id = agent_id or "general"
+        
         try:
-            # Determine agent ID (check multiple sources in priority order)
-            agent_id = None
+            # Send the log to the API
+            response = requests.post(
+                "http://127.0.0.1:9000/save_log",
+                json={"agent_id": agent_id, "log_entry": log_entry}
+            )
             
-            # 1. Check if record has agent_id attribute (added by filter)
-            if hasattr(record, 'agent_id'):
-                agent_id = record.agent_id
-                print(f"Agent ID from record: {agent_id}")
-            # 2. Use handler's agent_id if set
-            if not agent_id and self.agent_id:
-                agent_id = self.agent_id
-                print(f"Agent ID from handler: {agent_id}")
-            # 3. Check thread-local storage
-            if not agent_id:
-                agent_id = get_current_agent_id()
-                print(f"Agent ID from thread-local storage: {agent_id}")
-            # 4. Try to extract from message as last resort
-            if not agent_id and hasattr(record, 'msg'):
-                msg = str(record.msg)
-                if "Agent " in msg and ":" in msg:
-                    agent_id = msg.split("Agent ")[1].split(":")[0].strip()
-                    print(f"Extracted Agent ID from message: {agent_id}")
-            # Fall back to general if all else fails
-            agent_id = agent_id or "general"
-            
-            # Create directory structure
-            agent_dir = self.data_dir / agent_id
-            agent_dir.mkdir(exist_ok=True)
-            
-            logs_dir = agent_dir / "logs"
-            logs_dir.mkdir(exist_ok=True)
-            
-            # Get current date for log file naming
-            current_date = datetime.now().strftime("%Y-%m-%d")
-            log_file = logs_dir / f"{current_date}.log"
-            
-            # Append log entry to file
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(f"{log_entry}\n")
+            if response.status_code != 200:
+                print(f"Error sending log to API: {response.text}")
                 
         except Exception as e:
             # Don't let log saving errors propagate
-            print(f"Error saving log to file: {e}")
+            print(f"Error saving log to API: {e}")
 
 def setup_logging():
     """Configure the root logger with console and file handlers"""
