@@ -4,8 +4,13 @@ import json
 from pathlib import Path
 from fastapi import FastAPI, Request
 import uvicorn
-from datetime import datetime
 
+import glob
+import os
+import subprocess
+import tempfile
+from fastapi import HTTPException, Response, Body
+from datetime import datetime
 # Import centralized logging
 from logging_setup import get_logger, b64_to_png, DATA_DIR
 
@@ -25,108 +30,54 @@ async def root():
 async def post_agent_history_step(request: Request):
     data = await request.json()
     
-    # Determine which event type we're dealing with (pre_step or post_step)
+    # Determine event type and agent_id
     event_type = data.get("event_type", "unknown")
     agent_id = data.get("agent_id", "unknown")
-    
     logger.info(f"Processing {event_type} data for agent {agent_id}")
-    
-    # Create agent-specific directory
-    agent_dir = DATA_DIR / Path(agent_id)
+
+    # Ensure agent directory exists
+    agent_dir = Path(DATA_DIR) / agent_id
     agent_dir.mkdir(exist_ok=True)
-    
-    # Create event-type specific directories
-    event_dir = agent_dir / event_type
-    event_dir.mkdir(exist_ok=True)
-    
-    # Create separate directories for different content types
-    recordings_dir = event_dir / "json"
-    recordings_dir.mkdir(exist_ok=True)
-    
-    screenshots_dir = event_dir / "screenshots" 
-    screenshots_dir.mkdir(exist_ok=True)
 
-    # Determine the next file number within this specific event type
-    existing_numbers = []
-    for item in recordings_dir.iterdir():
-        if item.is_file() and item.suffix == ".json":
-            try:
-                file_num = int(item.stem)
-                existing_numbers.append(file_num)
-            except ValueError:
-                # In case the file name isn't just a number
-                pass
+    # Ensure screenshots directory exists
+    screenshots_dir = agent_dir / event_type / "screenshots"
+    screenshots_dir.mkdir(parents=True, exist_ok=True)
 
-    next_number = max(existing_numbers) + 1 if existing_numbers else 1
-    
-    # Get step number from the data (different fields for pre and post)
-    step_number = data.get("step_number")
-    if step_number is not None:
-        # Use the step number as the file name if available
-        file_name = f"{step_number:03d}"
-    else:
-        file_name = f"{next_number:03d}"
-
-    # Construct the file path
-    file_path = recordings_dir / f"{file_name}.json"
-
-    # Extract the screenshot and HTML before saving the main JSON
+    # Prepare clean data (handling screenshot)
     website_screenshot = data.get("website_screenshot")
     
     # Remove large fields from the JSON before saving
-    clean_data = {**data}
+    clean = {**data}
     if website_screenshot:
-        clean_data["website_screenshot"] = f"See screenshots/{file_name}.png"
-        
-        # Save the screenshot
-        screenshot_path = screenshots_dir / f"{file_name}.png"
+        clean["website_screenshot"] = f"See screenshots/{agent_id}_{event_type}_{clean.get('step_number', '')}.png"
+        screenshot_path = screenshots_dir / f"{agent_id}_{event_type}_{clean.get('step_number', '')}.png"
         try:
             b64_to_png(website_screenshot, screenshot_path)
         except Exception as e:
             logger.error(f"Error saving screenshot: {e}")
 
-    # Save the JSON data to the file
-    with file_path.open("w") as f:
-        json.dump(clean_data, f, indent=2)
-        
-    logger.info(f"Successfully saved agent history step to {file_path}")
+    # Aggregate into a single file per event_type
+    aggregate_file = agent_dir / f"{event_type}.json"
+    if aggregate_file.exists():
+        try:
+            existing = json.loads(aggregate_file.read_text(encoding="utf-8"))
+            if not isinstance(existing, list):
+                existing = []
+        except Exception:
+            existing = []
+    else:
+        existing = []
 
-    return {
-        "status": "ok", 
-        "message": f"Saved to {file_path}",
-        "file_id": file_name,
-        "event_type": event_type,
-        "agent_id": agent_id
-    }
+    existing.append(clean)
+    with aggregate_file.open("w", encoding="utf-8") as f:
+        json.dump(existing, f, indent=2)
 
-@app.post("/save_log")
-async def save_log(request: Request):
-    data = await request.json()
-    
-    agent_id = data.get("agent_id", "general")
-    log_entry = data.get("log_entry")
-    
-    logger.info(f"Saving log for agent {agent_id}")
-    
-    # Create agent-specific directory
-    agent_dir = Path(DATA_DIR) / agent_id
-    agent_dir.mkdir(exist_ok=True)
-    
-    # Create logs directory
-    logs_dir = agent_dir / "logs"
-    logs_dir.mkdir(exist_ok=True)
-    
-    # Get current date for log file naming
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    log_file = logs_dir / f"{current_date}.log"
-    
-    # Append log entry to file
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(f"{log_entry}\n")
-        
+    logger.info(f"Appended step {clean.get('step_number')} to {aggregate_file}")
+
     return {
         "status": "ok",
-        "message": f"Log saved for agent {agent_id}",
+        "message": f"Appended step to {aggregate_file}",
+        "event_type": event_type,
         "agent_id": agent_id
     }
 

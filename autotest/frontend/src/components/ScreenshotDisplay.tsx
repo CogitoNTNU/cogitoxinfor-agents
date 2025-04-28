@@ -52,7 +52,7 @@ export const ScreenshotDisplay: React.FC<ScreenshotDisplayProps> = ({
       <Card className={cn("w-full border-none", className)}>
           {screenshots.length === 0 && loading ? ( // Use loading prop
               <div className="flex items-center justify-center flex-1 border border-dashed rounded-md">
-                <p className="text-muted-foreground">Agent Running...</p> {/* Or a loading indicator */}
+                <p className="text-muted-foreground">Agent waiting for task...</p> {/* Or a loading indicator */}
               </div>
           ) : screenshots.length === 0 ? (
             <div className="flex items-center justify-center flex-1 border border-dashed rounded-md">
