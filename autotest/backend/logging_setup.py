@@ -63,21 +63,25 @@ class LogHandler(logging.Handler):
         # 1. Check if record has agent_id attribute (added by filter)
         if hasattr(record, 'agent_id'):
             agent_id = record.agent_id
+            print(f"Agent ID from record: {agent_id}")
         
         # 2. Use handler's agent_id if set
         if not agent_id and self.agent_id:
             agent_id = self.agent_id
+            print(f"Agent ID from handler: {agent_id}")
         
         # 3. Check thread-local storage
         if not agent_id:
             agent_id = get_current_agent_id()
+            print(f"Agent ID from thread-local storage: {agent_id}")
         
         # 4. Try to extract from message as last resort
         if not agent_id and hasattr(record, 'msg'):
             msg = str(record.msg)
             if "Agent " in msg and ":" in msg:
                 agent_id = msg.split("Agent ")[1].split(":")[0].strip()
-        
+                print(f"Extracted Agent ID from message: {agent_id}")
+
         # Fall back to general if all else fails
         agent_id = agent_id or "general"
         

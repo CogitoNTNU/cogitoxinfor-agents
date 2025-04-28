@@ -4,13 +4,14 @@ import json
 from pathlib import Path
 from fastapi import FastAPI, Request
 import uvicorn
+from datetime import datetime
 
 import glob
 import os
 import subprocess
 import tempfile
 from fastapi import HTTPException, Response, Body
-from datetime import datetime
+
 # Import centralized logging
 from logging_setup import get_logger, b64_to_png, DATA_DIR
 
@@ -80,6 +81,146 @@ async def post_agent_history_step(request: Request):
         "event_type": event_type,
         "agent_id": agent_id
     }
+
+@app.post("/save_log")
+async def save_log(request: Request):
+    data = await request.json()
+    
+    agent_id = data.get("agent_id", "general")
+    log_entry = data.get("log_entry")
+    
+    logger.info(f"Saving log for agent {agent_id}")
+    
+    # Create agent-specific directory
+    agent_dir = Path(DATA_DIR) / agent_id
+    agent_dir.mkdir(exist_ok=True)
+    
+    # Create logs directory
+    logs_dir = agent_dir / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    
+    # Get current date for log file naming
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    log_file = logs_dir / f"{current_date}.log"
+    
+    # Append log entry to file
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(f"{log_entry}\n")
+        
+    return {
+        "status": "ok",
+        "message": f"Log saved for agent {agent_id}",
+        "agent_id": agent_id
+    }
+
+@app.get("/api/generate")
+async def generate_test(agentId: str):
+    base_dir = Path(DATA_DIR) / agentId
+    # Aggregated log files
+    pre_file = base_dir / "pre_step.json"
+    post_file = base_dir / "post_step.json"
+
+    logs = []
+    # Load pre_step entries if exists
+    if pre_file.exists():
+        try:
+            pre_logs = json.loads(pre_file.read_text(encoding="utf-8"))
+            if isinstance(pre_logs, list):
+                logs.extend(pre_logs)
+        except Exception as e:
+            raise HTTPException(500, f"Error reading {pre_file.name}: {e}")
+
+    # Load post_step entries if exists
+    if post_file.exists():
+        try:
+            post_logs = json.loads(post_file.read_text(encoding="utf-8"))
+            if isinstance(post_logs, list):
+                logs.extend(post_logs)
+        except Exception as e:
+            raise HTTPException(500, f"Error reading {post_file.name}: {e}")
+
+    if not logs:
+        raise HTTPException(404, "No log entries found for this agent")
+
+    # Build the Playwright script
+    lines = [
+        "import pytest",
+        "from playwright.sync_api import sync_playwright",
+        "",
+        "def test_from_log():",
+        "    with sync_playwright() as p:",
+        "        browser = p.chromium.launch(headless=False)",
+        "        page = browser.new_page()",
+    ]
+    for entry in logs:
+        # Navigate to URL
+        url = entry.get("url")
+        if url:
+            lines.append(f'        page.goto("{url}")')
+
+        # Handle new "actions" or legacy "model_outputs"
+        actions_list = []
+        if isinstance(entry.get("actions"), list):
+            actions_list = entry["actions"]
+        else:
+            mo = entry.get("model_outputs") or {}
+            if isinstance(mo, dict):
+                actions_list = mo.get("action", [])
+
+        for act in actions_list:
+            if not isinstance(act, dict):
+                continue
+            # Wait
+            if act.get("wait"):
+                secs = act["wait"]["seconds"]
+                lines.append(f"        page.wait_for_timeout({secs} * 1000)")
+            # Input text
+            if act.get("input_text"):
+                txt = act["input_text"].get("text", "").replace('"', '\\"')
+                sel = entry.get("model_actions", {}) \
+                    .get("interacted_element", {}) \
+                    .get("css_selector", "")
+                lines.append(f'        page.fill("{sel}", "{txt}")')
+            # Click by index
+            if act.get("click_element_by_index"):
+                idx = act["click_element_by_index"].get("index", 0)
+                sel = entry.get("model_actions", {}) \
+                    .get("interacted_element", {}) \
+                    .get("css_selector", "")
+                if not sel:
+                    sel = f'* >> nth={idx}'
+                lines.append(f'        page.click("{sel}")')
+            # Step done comment
+            if act.get("done"):
+                lines.append(f'        # Step done: {act["done"].get("text", "")}')
+
+    lines.append("        browser.close()")
+    script = "\n".join(lines)
+    return Response(script, media_type="text/plain")
+
+@app.post("/api/run-test")
+async def run_test(body: dict = Body(...)):
+    script = body.get("script")
+    if not script:
+        raise HTTPException(400, "No script provided")
+    tf = tempfile.NamedTemporaryFile(delete=False, suffix=".py")
+    tf.write(script.encode("utf-8"))
+    tf.flush()
+    tf.close()
+    try:
+        result = subprocess.run(
+            ["pytest", tf.name, "--maxfail=1", "--disable-warnings", "-q"],
+            capture_output=True, text=True, timeout=30
+        )
+        output = result.stdout + result.stderr
+    except subprocess.TimeoutExpired:
+        output = "Error: Test execution timed out."
+    finally:
+        try:
+            os.unlink(tf.name)
+        except:
+            pass
+    return Response(output, media_type="text/plain")
 
 if __name__ == "__main__":
     logger.info("Starting Browser-Use recording API on http://0.0.0.0:9000")
