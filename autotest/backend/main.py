@@ -121,6 +121,7 @@ def record_activity_after(agent_id: str):
             # Process data for API submission
             result = last_entry.result[-1] if hasattr(last_entry, "result") and last_entry.result else None
             actions = []
+            element_actions = []
             brain = None
             
             if hasattr(last_entry, "model_output") and last_entry.model_output:
@@ -129,6 +130,57 @@ def record_activity_after(agent_id: str):
                     actions = obj_to_json(
                         obj=[a for a in last_entry.model_output.action]
                     )
+                    
+                    # Extract element details for each action in message_output.txt format
+                    for i, action in enumerate(last_entry.model_output.action):
+                        action_data = action.model_dump(exclude_unset=True)
+                        
+                        # Get action type (click, input_text, etc.)
+                        action_type = list(action_data.keys())[0] if action_data else None
+                        
+                        if not action_type:
+                            continue
+                            
+                        # Get action parameters
+                        params = action_data.get(action_type, {})
+                        
+                        # Extract element information
+                        element_id = None
+                        highlight_index = None
+                        
+                        # Extract different ways an element could be identified
+                        if isinstance(params, dict):
+                            element_id = params.get('html_id') or params.get('selector') or params.get('id')
+                            highlight_index = params.get('highlight_index')
+                        
+                        # Create record for message_output.txt format
+                        is_error = result.error is not None if result else True
+                        element_action = {
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "action": action_type,
+                            "element_id": element_id,
+                            "success": not is_error,
+                            "error": result.error if result and hasattr(result, "error") else None
+                        }
+                        
+                        # If we have interacted elements from state, get more details
+                        if hasattr(last_entry.state, "interacted_element") and last_entry.state.interacted_element:
+                            interacted = last_entry.state.interacted_element
+                            if i < len(interacted) and interacted[i]:
+                                if not element_id and hasattr(interacted[i], "id"):
+                                    element_id = interacted[i].id
+                                    element_action["element_id"] = element_id
+                                
+                                if hasattr(interacted[i], "tag_name"):
+                                    element_action["tag_name"] = interacted[i].tag_name
+                                    
+                                if hasattr(interacted[i], "attributes"):
+                                    element_action["attributes"] = interacted[i].attributes
+                                    
+                                if hasattr(interacted[i], "highlight_index") and highlight_index is None:
+                                    element_action["highlight_index"] = interacted[i].highlight_index
+                        
+                        element_actions.append(element_action)
                 
                 # Get brain state
                 if hasattr(last_entry.model_output, "current_state"):
@@ -145,6 +197,7 @@ def record_activity_after(agent_id: str):
                 "website_screenshot": screenshot_data,
                 "website_html": None,  # Not capturing HTML in this hook
                 "actions": actions,
+                "element_actions": element_actions,  # New field with element details
                 "brain_state": {
                     "memory": brain.memory if brain and hasattr(brain, "memory") else None,
                     "next_goal": brain.next_goal if brain and hasattr(brain, "next_goal") else None
@@ -158,12 +211,31 @@ def record_activity_after(agent_id: str):
             # Send data to the API
             result = send_agent_history_step(data=model_step_summary)
             print(f"Recording API response: {result}")
+            
+            # Also save element actions in message_output.txt format
+            save_element_actions(element_actions, agent_id)
                 
         except Exception as e:
             # Robust exception handling
             logger.error(f"Error in post-step hook for agent {agent_id}: {str(e)}", exc_info=True)
-    
+
     return action_logger
+
+
+# Helper function to save element actions in the same format as message_output.txt
+def save_element_actions(element_actions, agent_id):
+    try:
+        # Ensure directory exists
+        os.makedirs("logs", exist_ok=True)
+        
+        # Save to file in the format of message_output.txt
+        with open(f"logs/{agent_id}_actions.txt", "a") as f:
+            for action in element_actions:
+                f.write(json.dumps(action) + "\n")
+    except Exception as e:
+        logger.error(f"Error saving element actions: {str(e)}")
+
+
 
 def record_activity_before(agent_id: str):
     """Returns an async callback that logs agent state before each step."""
