@@ -60,7 +60,7 @@ const AgentController: React.FC = () => {
 
   return (
     <Card className="w-full mb-6">
-      <CardContent className="pt-2 pl-2 relative">
+      <CardContent className="p-2 relative">
         <Textarea
           placeholder="Enter your task here..."
           value={task}
@@ -72,26 +72,26 @@ const AgentController: React.FC = () => {
             }
           }}
           rows={3}
-          className="mb-2 border-none focus:border-none focus:ring-0 focus:outline-none resize-none"
+          className="border-none focus:border-none focus:ring-0 focus:outline-none resize-none"
         />
         <div className="relative">
           {!isRunning && (
-            <Button onClick={handleRun} variant="ghost" className="absolute bottom-2 right-2 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
+            <Button onClick={handleRun} variant="ghost" className="absolute bottom-0 right-0 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
               <Play className="h-6 w-6" />
             </Button>
           )}
           {isRunning && !isPaused && (
-            <Button onClick={handlePause} variant="ghost" className="absolute bottom-2 right-2 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
+            <Button onClick={handlePause} variant="ghost" className="absolute bottom-0 right-0 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
               <Pause className="h-6 w-6" />
             </Button>
           )}
           {isPaused && (
-            <Button onClick={handleResume} variant="ghost" className="absolute bottom-2 right-2 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
+            <Button onClick={handleResume} variant="ghost" className="absolute bottom-0 right-0 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
               <PlayCircle className="h-6 w-6" />
             </Button>
           )}
           {(isRunning || isPaused) && (
-            <Button onClick={handleStop} variant="ghost" className="absolute bottom-2 right-14 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
+            <Button onClick={handleStop} variant="ghost" className="absolute bottom-0 right-14 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center">
               <Square className="h-6 w-6" />
             </Button>
           )}

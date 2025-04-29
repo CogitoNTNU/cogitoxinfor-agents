@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '../components/ui/button'; // Keep Button for Clear Logs/Screenshots
 import { RefreshCcw } from 'lucide-react'; // Keep Refresh icon
 import TestGenerator from '../components/TestGenerator'; // Import the new component
+import { useNavigate } from 'react-router-dom';
 
 interface AgentPanelProps {
   agentId: string;
@@ -53,17 +54,41 @@ const AgentPanel: React.FC<AgentPanelProps> = ({ agentId }) => {
 };
 
 const AgentApp: React.FC = () => {
-  const { currentAgentId } = useAgent();
+  const { currentAgentId, setCurrentAgentId, runAgent } = useAgent();
   const { state, isMobile } = useSidebar(); // Use the useSidebar hook
+  const navigate = useNavigate();
 
-  // Calculate left padding based on sidebar state
+  // Handle pending prompt from landing page
+  useEffect(() => {
+    const pendingPrompt = localStorage.getItem('pendingPrompt');
+    const pendingAgentId = localStorage.getItem('pendingAgentId');
+    
+    if (pendingPrompt && pendingAgentId) {
+      // Set the current agent ID
+      setCurrentAgentId(pendingAgentId);
+      
+      // Run the agent with the prompt
+      setTimeout(() => {
+        runAgent({ 
+          query: pendingPrompt, 
+          testing: false, 
+          human_intervention: false, 
+          test_actions: [] 
+        });
+        
+        // Clear the localStorage
+        localStorage.removeItem('pendingPrompt');
+        localStorage.removeItem('pendingAgentId');
+      }, 500); // Small delay to ensure agent ID is set
+    }
+  }, [setCurrentAgentId, runAgent]);
 
   return (
     <div className="container mx-auto py-6 h-[calc(100vh-3rem)] flex flex-col">
       <header className="text-center mb-4">
-        <h1 className="text-3xl font-bold">AI-Powered Test Automation 🤖</h1>
+        <h1 className="text-3xl font-bold">AI-Powered Test Automation</h1>
         <p className="text-muted-foreground">
-           Our agent browses your site, figures out the flows, and generates ready-to-run web tests.              </p>
+         AI browses → Logs each step → Generates tests</p>
 
       </header>
       <div className="flex flex-1 overflow-hidden"> {/* Main flex container */}

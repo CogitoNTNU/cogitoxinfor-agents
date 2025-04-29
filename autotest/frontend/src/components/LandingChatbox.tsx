@@ -1,0 +1,74 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent } from './ui/card';
+import { Textarea } from './ui/textarea';
+import { Button } from './ui/button';
+import { Play } from 'lucide-react';
+import { BorderBeam } from "@/components/magicui/border-beam";
+import { agentApi } from '@/services/api.tsx';
+import { ShineBorder } from "@/components/magicui/shine-border";
+
+
+
+const LandingChatbox: React.FC = () => {
+  const [task, setTask] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleRun = async () => {
+    if (!task.trim() || isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      // Create a new agent
+      const response = await agentApi.createAgent();
+      const agentId = response.data.agent_id;
+      
+      // Store the prompt and agent ID in localStorage
+      localStorage.setItem('pendingPrompt', task);
+      localStorage.setItem('pendingAgentId', agentId);
+      
+      // Redirect to the main app
+      navigate('/app');
+    } catch (error) {
+      console.error('Error creating agent:', error);
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card className="relative w-full mb-6 overflow-hidden">
+        <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
+      <CardContent className="p-2 relative">
+     
+        <Textarea
+          placeholder="Describe the task you want to test..."
+          value={task}
+          onChange={(e) => setTask(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleRun();
+            }
+          }}
+          rows={3}
+          className="border-none focus:border-none focus:ring-0 focus:outline-none resize-none"
+          disabled={isLoading}
+        />
+                 <div className="relative">
+          <Button 
+            onClick={handleRun} 
+            variant="ghost" 
+            className="absolute bottom-0 right-0 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center"
+            disabled={!task.trim() || isLoading}
+          >
+            <Play className="h-6 w-6" />
+          </Button>
+        </div>
+      
+      </CardContent>
+    </Card>
+  );
+};
+
+export default LandingChatbox;
