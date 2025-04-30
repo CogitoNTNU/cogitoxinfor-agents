@@ -43,7 +43,7 @@ class AgentManager:
                 
                 # Configure browser with persistent profile
                 browser_config = BrowserConfig(
-                    headless=False,
+                    headless=True,
                     disable_security=True,
                     extra_chromium_args=[f'--user-data-dir={agent_profile_dir}']
                 )

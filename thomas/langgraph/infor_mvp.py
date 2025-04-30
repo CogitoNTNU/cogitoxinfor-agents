@@ -55,15 +55,6 @@ async def main():
         #login_history = await login_agent.run()
         m3_history = await m3_agent.run()
 
-        os.makedirs("logs", exist_ok=True)
-        with open("logs/browser_logs.txt", "w") as log_file:
-            log_file.write("M3 Agent History:\n")
-            log_file.write("Visited URLs: " + str(m3_history.urls()) + "\n")
-            log_file.write("Screenshots: " + str(m3_history.screenshots()) + "\n")
-            log_file.write("Action names: " + str(m3_history.action_names()) + "\n")
-            log_file.write("Extracted content: " + str(m3_history.extracted_content()) + "\n")
-            log_file.write("Errors: " + str(m3_history.errors()) + "\n")
-            log_file.write("Model actions: " + str(m3_history.model_actions()) + "\n")
 
 if __name__ == '__main__':
     # Ensure the event loop is properly managed

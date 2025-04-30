@@ -32,6 +32,19 @@ const LandingChatbox: React.FC = () => {
       navigate('/app');
     } catch (error) {
       console.error('Error creating agent:', error);
+      
+      // Check if it's a connection error (likely API server not running)
+      if (error.message && error.message.includes('Network Error')) {
+        alert('Failed to connect to the backend server. Please ensure the API server is running on port 9000.');
+      } else if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        alert(`Server error: ${error.response.status} - ${error.response.data.detail || 'Unknown error'}`);
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        alert('Failed to create agent. Please try again later.');
+      }
+      
       setIsLoading(false);
     }
   };

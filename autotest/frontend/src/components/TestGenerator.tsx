@@ -23,12 +23,26 @@ const TestGenerator: React.FC = () => {
       const url = `/api/generate?agentId=${currentAgentId}`;
       console.log("Fetching from URL:", url);
       const res = await fetch(url);
+      
+      if (!res.ok) {
+        // Handle HTTP error responses
+        const errorText = await res.text();
+        console.error(`Error response (${res.status}):`, errorText);
+        throw new Error(`API error: ${res.status} - ${errorText || 'Unknown error'}`);
+      }
+      
       console.log("Response status:", res.status);
       const scriptText = await res.text();
+      
+      if (!scriptText || scriptText.trim() === '') {
+        throw new Error('Received empty response from the API');
+      }
+      
       console.log("Received script text:", scriptText.substring(0, 100) + "...");
       setScript(scriptText);
     } catch (err) {
       console.error('Error generating test:', err);
+      alert(`Failed to generate test: ${err.message || 'API server may not be running. Check if the API server is running on port 9000.'}`);
     } finally {
       setLoadingGen(false);
     }
@@ -42,10 +56,20 @@ const TestGenerator: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ script }),
       });
+      
+      if (!res.ok) {
+        // Handle HTTP error responses
+        const errorText = await res.text();
+        console.error(`Error response (${res.status}):`, errorText);
+        throw new Error(`API error: ${res.status} - ${errorText || 'Unknown error'}`);
+      }
+      
       const output = await res.text();
-      setOutput(output);
+      setOutput(output || 'No output received from test run');
     } catch (err) {
       console.error('Error running test:', err);
+      setOutput(`Error running test: ${err.message || 'API server may not be running. Check if the API server is running on port 9000.'}`);
+      alert(`Failed to run test: ${err.message || 'API server may not be running. Check if the API server is running on port 9000.'}`);
     } finally {
       setRunning(false);
     }
@@ -59,7 +83,7 @@ const TestGenerator: React.FC = () => {
   const canGenerateTest = !!currentAgentId;
 
   return (
-    <div className="flex flex-col h-[30rem] w-[70rem] mx-auto">
+    <div className="flex flex-col h-[40rem] w-[70rem] mx-auto">
       <RainbowButton
         className="mb-8 mt-8 self-center"
         onClick={generateTest}

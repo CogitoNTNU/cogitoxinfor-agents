@@ -8,6 +8,8 @@ interface LogEntry {
   message: string;
   level: string;
   timestamp: string;
+  log_type?: 'goal' | 'action' | 'memory' | 'eval' | 'step' | 'result' | 'generic' | 'error';
+  agent_id?: string;
 }
 
 export function useAgentStream(agentId: string | null) {
@@ -38,22 +40,41 @@ export function useAgentStream(agentId: string | null) {
     const es = agentApi.streamAgentEvents(agentId);
 
     es.addEventListener('log', (e: MessageEvent) => {
-      let entry: any;
       try {
-        entry = JSON.parse(e.data);
-      } catch {
-        entry = { timestamp: new Date().toISOString(), message: e.data, level: 'info' };
+        const entryData = JSON.parse(e.data);
+
+        // Basic validation (ensure it's an object with expected fields)
+        if (typeof entryData !== 'object' || !entryData.timestamp || !entryData.message) {
+          console.warn('Received malformed log data:', entryData);
+          return;
+        }
+
+        // Skip if log is for a different agent (backend should filter, but good to double-check)
+        if (entryData.agent_id && entryData.agent_id !== agentId) return;
+
+        setLogs(prev => [
+          ...prev,
+          {
+            id: `${entryData.timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: entryData.timestamp,
+            level: entryData.level || 'info',
+            log_type: entryData.log_type || 'generic',
+            message: entryData.message,
+            agent_id: entryData.agent_id
+          },
+        ]);
+      } catch (error) {
+        console.error('Failed to parse log data:', e.data, error);
+        // Fallback for plain string logs (legacy support)
+        const timestamp = new Date().toISOString();
+        setLogs(prev => [...prev, { 
+          id: `${timestamp}-${Math.random().toString(36).substr(2, 9)}`, 
+          timestamp, 
+          level: 'info', 
+          log_type: 'generic', 
+          message: e.data 
+        }]);
       }
-      if (entry.agent_id && entry.agent_id !== agentId) return;
-      setLogs(prev => [
-        ...prev,
-        {
-          id: entry.timestamp,
-          message: entry.message ?? JSON.stringify(entry.actions || entry),
-          level: entry.level ?? 'info',
-          timestamp: entry.timestamp,
-        },
-      ]);
     });
 
     es.addEventListener('screenshot', (e: MessageEvent) => {

@@ -86,7 +86,7 @@ const AgentApp: React.FC = () => {
   return (
     <div className="container mx-auto py-6 h-[calc(100vh-3rem)] flex flex-col">
       <header className="text-center mb-4">
-        <h1 className="text-3xl font-bold">AI-Powered Test Automation</h1>
+        <h1 className="text-3xl font-bold">AI Test Automation</h1>
         <p className="text-muted-foreground">
          AI browses → Logs each step → Generates tests</p>
 

@@ -28,25 +28,46 @@ import subprocess
 import sys
 import threading
 
+# Logger setup must come before any use of logger in start_api_server
+from logging_setup import get_logger
+logger = get_logger(__name__)
+
 def start_api_server():
-    subprocess.Popen(
-        [sys.executable, "api.py"],
-        cwd=os.path.dirname(__file__)
-    )
-    print("Started api.py server in background")
+    try:
+        process = subprocess.Popen(
+            [sys.executable, "api.py"],
+            cwd=os.path.dirname(__file__),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        # Don't wait for communicate here as it would block the thread
+        # Just log that we've started the process
+        logger.info("API server process started")
+        
+        # Start a monitoring thread to capture output
+        def monitor_process():
+            try:
+                stdout, stderr = process.communicate()
+                if process.returncode != 0:
+                    logger.error(f"API server exited with code {process.returncode}: {stderr.decode()}")
+                else:
+                    logger.info("API server exited normally")
+            except Exception as e:
+                logger.error(f"Error monitoring API server: {str(e)}")
+                
+        threading.Thread(target=monitor_process, daemon=True).start()
+    except Exception as e:
+        logger.error(f"Error starting API server: {str(e)}")
 
 # Start API server in a background thread
 threading.Thread(target=start_api_server, daemon=True).start()
 # Wait a moment for the server to start
-time.sleep(1)
+time.sleep(2)  # Increased wait time to give the server more time to initialize
 
 from logging_setup import (
-    get_logger, log_queue, log_lock, screenshot_queue, screenshot_lock,
+    log_queue, log_lock, screenshot_queue, screenshot_lock,
     setup_agent_logger, set_current_agent_id, STATIC_DIR,
 )
-
-# Then replace the logger initialization with:
-logger = get_logger(__name__)
 
 
 app = FastAPI()
@@ -99,10 +120,11 @@ def record_activity_after(agent_id: str):
             # Get the latest history entry
             last_entry = history.history[-1]
             step_number = len(history.history)
-            logger = setup_agent_logger(agent_id)
+            # Use the same logger instance for all logs from this agent
+            agent_logger = setup_agent_logger(agent_id)
             url = last_entry.state.url if hasattr(last_entry.state, "url") else "No URL"
             title = last_entry.state.title if hasattr(last_entry.state, "title") else "No title"
-            logger.info(f"Step {step_number:03d} → {url} ({title!r})")
+            agent_logger.info(f"Step {step_number:03d} → {url} ({title!r})")
             
             # Extract screenshot and handle streaming queue
             screenshot_data = None
@@ -123,65 +145,62 @@ def record_activity_after(agent_id: str):
             actions = []
             element_actions = []
             brain = None
-            
+
             if hasattr(last_entry, "model_output") and last_entry.model_output:
                 # Extract actions
                 if hasattr(last_entry.model_output, "action"):
                     actions = obj_to_json(
                         obj=[a for a in last_entry.model_output.action]
                     )
-                    
-                    # Extract element details for each action in message_output.txt format
+                # Build structured element_actions for logging
+                element_actions = []
+                if hasattr(last_entry.model_output, "action"):
                     for i, action in enumerate(last_entry.model_output.action):
-                        action_data = action.model_dump(exclude_unset=True)
-                        
-                        # Get action type (click, input_text, etc.)
-                        action_type = list(action_data.keys())[0] if action_data else None
-                        
-                        if not action_type:
-                            continue
-                            
-                        # Get action parameters
-                        params = action_data.get(action_type, {})
-                        
-                        # Extract element information
-                        element_id = None
-                        highlight_index = None
-                        
-                        # Extract different ways an element could be identified
-                        if isinstance(params, dict):
-                            element_id = params.get('html_id') or params.get('selector') or params.get('id')
-                            highlight_index = params.get('highlight_index')
-                        
-                        # Create record for message_output.txt format
-                        is_error = result.error is not None if result else True
-                        element_action = {
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "action": action_type,
-                            "element_id": element_id,
-                            "success": not is_error,
-                            "error": result.error if result and hasattr(result, "error") else None
-                        }
-                        
-                        # If we have interacted elements from state, get more details
-                        if hasattr(last_entry.state, "interacted_element") and last_entry.state.interacted_element:
-                            interacted = last_entry.state.interacted_element
-                            if i < len(interacted) and interacted[i]:
-                                if not element_id and hasattr(interacted[i], "id"):
-                                    element_id = interacted[i].id
-                                    element_action["element_id"] = element_id
-                                
-                                if hasattr(interacted[i], "tag_name"):
-                                    element_action["tag_name"] = interacted[i].tag_name
-                                    
-                                if hasattr(interacted[i], "attributes"):
-                                    element_action["attributes"] = interacted[i].attributes
-                                    
-                                if hasattr(interacted[i], "highlight_index") and highlight_index is None:
-                                    element_action["highlight_index"] = interacted[i].highlight_index
-                        
-                        element_actions.append(element_action)
-                
+                        action_data = action.model_dump(exclude_unset=True) or {}
+                        action_type = next(iter(action_data), None)
+                        params = action_data.get(action_type, {}) if isinstance(action_data, dict) else {}
+                        # Normalize action names (including navigation)
+                        if action_type in ("click", "click_element_by_index"):
+                            norm_action = "click"
+                        elif action_type == "input_text":
+                            norm_action = "fill"
+                        elif action_type == "wait":
+                            norm_action = "wait"
+                        elif action_type == "go_to_url":
+                            norm_action = "navigate"
+                        else:
+                            norm_action = action_type or "unknown"
+                        # Timestamp and step
+                        ts = datetime.now(timezone.utc).isoformat()
+                        step = step_number
+                        # Derive selector: prefer css_selector, then element_id, then attributes
+                        selector = None
+                        interacted = getattr(last_entry.state, "interacted_element", None)
+                        if interacted and i < len(interacted) and interacted[i]:
+                            el = interacted[i]
+                            if hasattr(el, "css_selector") and el.css_selector:
+                                selector = el.css_selector
+                            elif hasattr(el, "id") and el.id:
+                                selector = f"#{el.id}"
+                            elif hasattr(el, "attributes") and el.attributes.get("id"):
+                                selector = f"#{el.attributes['id']}"
+                        # Build record
+                        rec = {"step": step, "timestamp": ts, "action": norm_action}
+                        if selector:
+                            rec["selector"] = selector
+                        # Populate action-specific fields
+                        if norm_action == "click":
+                            rec["button"] = params.get("button", "left")
+                            rec["click_count"] = params.get("click_count", 1)
+                        elif norm_action == "wait" and isinstance(params.get("seconds"), (int, float)):
+                            rec["timeout"] = int(params["seconds"] * 1000)
+                        elif norm_action == "fill" and isinstance(params.get("text"), str):
+                            rec["text"] = params["text"]
+                        elif norm_action == "navigate":
+                            url = params.get("url")
+                            if isinstance(url, str):
+                                rec["url"] = url
+                        element_actions.append(rec)
                 # Get brain state
                 if hasattr(last_entry.model_output, "current_state"):
                     brain = last_entry.model_output.current_state
@@ -237,8 +256,13 @@ def save_element_actions(element_actions, agent_id):
 
 
 
+
+
 def record_activity_before(agent_id: str):
     """Returns an async callback that logs agent state before each step."""
+    # Get a single logger instance for this agent
+    agent_logger = setup_agent_logger(agent_id)
+    
     async def before_step_hook(agent):
         try:
             print(f'--- ON_STEP_START HOOK for agent {agent_id} ---')
@@ -248,12 +272,12 @@ def record_activity_before(agent_id: str):
             
             # Make sure we have state history
             if not hasattr(agent, "state") or not agent.state:
-                logger.warning(f"Agent {agent_id}: No state available")
+                agent_logger.warning(f"No state available")
                 return
                 
             history = agent.state.history
             if not history:
-                logger.warning(f"Agent {agent_id}: No history available")
+                agent_logger.warning(f"No history available")
                 return
             
             # Process model data
@@ -329,8 +353,8 @@ async def run_agent(agent_id: str, request: RunRequest):
         # Kick off the browser‐automation in the background
         task = asyncio.create_task(
             agent.run(
-                on_step_end=record_activity_after(agent_id),
                 on_step_start=record_activity_before(agent_id),
+                on_step_end=record_activity_after(agent_id),
                 ))
 
         setup_time = time.time() - start_time
@@ -470,6 +494,10 @@ async def agent_stream(request: Request, agent_id: str):
     """
     SSE stream of logs and screenshots filtered by agent_id.
     """
+    # Set to track log hashes that have been sent to this client
+    # to prevent duplicate logs even across reconnections
+    sent_log_hashes = set()
+    
     async def event_generator():
         while True:
             # If client disconnects, stop the loop
@@ -481,7 +509,27 @@ async def agent_stream(request: Request, agent_id: str):
                 with log_lock:
                     while not log_queue.empty():
                         log_entry = log_queue.get()
-                        yield {'event': 'log', 'data': log_entry}
+                        
+                        # Parse the log entry to check for agent_id and log_hash
+                        try:
+                            # Try to parse as JSON
+                            entry_data = json.loads(log_entry)
+                            
+                            # Check if this log has already been sent to this client
+                            log_hash = entry_data.get('log_hash')
+                            if log_hash and log_hash in sent_log_hashes:
+                                continue
+                                
+                            # Only send logs for this agent or general logs with no agent_id
+                            if entry_data.get('agent_id') == agent_id or 'agent_id' not in entry_data:
+                                # Mark this log as sent to this client
+                                if log_hash:
+                                    sent_log_hashes.add(log_hash)
+                                yield {'event': 'log', 'data': log_entry}
+                        except json.JSONDecodeError:
+                            # If not JSON, assume it's a plain string and send it
+                            # (this is a fallback for backward compatibility)
+                            yield {'event': 'log', 'data': log_entry}
 
             # Stream screenshot entries for this agent
             if not screenshot_queue.empty():

@@ -3,6 +3,34 @@ import LandingChatbox from '../components/LandingChatbox';
 import { BlurFade } from "@/components/magicui/blur-fade";
 import { AnimatedShinyText } from "@/components/magicui/animated-shiny-text";
 
+const fillChatInput = (text: string) => {
+  const container = document.getElementById('landing-chatbox');
+  if (!container) return;
+  container.dispatchEvent(new CustomEvent('fillChatInput', { detail: { text } }));
+};
+
+const handleBuyPS5 = () => {
+  fillChatInput(
+    'Search on finn.no for a ps5 controller and message the owner that i want it for 80% of the price.'
+  );
+};
+
+const handleTestWebsite = () => {
+  fillChatInput(
+    'open http://localhost:8080/ and enter the prompt "Open wikipedia and search for Trump". Wait 10 seconds then press the stopbutton. Click on the test generation tab. Click generate test. Click run test.'
+  );
+};
+
+const handleAnswerMail = () => {
+  fillChatInput('Open outlook and answer my most recent mail.');
+};
+
+const handleFindFlights = () => {
+  fillChatInput(
+    'On booking.com search for flights from Oslo to Singapore in june and select the best one.'
+  );
+};
+
 
 const Landing: React.FC = () => {
   return (
@@ -11,8 +39,7 @@ const Landing: React.FC = () => {
         <div className="max-w-3xl mx-auto space-y-6 mb-16">
           <BlurFade delay={0.3} inView>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tighter text-white">
-              <span className="block">AI-Powered</span>
-              <span className="block">Test Automation</span>
+              <span className="block">Test Any Website</span>
             </h1>
           </BlurFade>
           
@@ -37,19 +64,47 @@ const Landing: React.FC = () => {
         </div>
         
         <BlurFade delay={0.7} inView>
-          <div className="max-w-3xl mx-auto">
+          <div id="landing-chatbox" className="max-w-3xl mx-auto">
             <LandingChatbox />
           </div>
+
+      <div className="flex flex-wrap justify-center pt-0!">
+      <button
+        onClick={handleBuyPS5}
+        className="rounded-full text-white px-3 m-2 py-2 bg-yellow-500/30"
+      >
+        Buy me a PS5 on finn.no
+      </button>
+
+      <button
+        onClick={handleTestWebsite}
+        className="rounded-full text-white px-3 m-2 py-2 bg-blue-500/50"
+      >
+        Test this website
+      </button>
+
+      <button
+        onClick={handleAnswerMail}
+        className="rounded-full text-white px-3 m-2 py-2 bg-green-500/50"
+      >
+        Answer my latest mail
+      </button>
+
+      <button
+        onClick={handleFindFlights}
+        className="rounded-full text-white px-3 m-2 py-2 bg-purple-500/50"
+      >
+        Find flights from Oslo to Singapore
+      </button>
+    </div>
         </BlurFade>
+
+
         
         <BlurFade delay={1.2} inView>
-        <div
-        className="group mx-auto w-[17rem] rounded-full border border-black/5 bg-neutral-100 text-base text-white transition-all ease-in hover:cursor-pointer hover:bg-neutral-200 dark:border-white/5 dark:bg-neutral-900 dark:hover:bg-neutral-800"
-        >
-        <AnimatedShinyText className="inline-flex items-center justify-center px-4 py-1 transition ease-out hover:text-neutral-600 hover:duration-300 hover:dark:text-neutral-400">
+        <AnimatedShinyText className="inline-flex items-center justify-center px-4 py-1 text-white transition ease-out hover:text-neutral-600 hover:duration-300 hover:dark:text-neutral-400">
           <span>⚡ Powered by Cogito × Infor ⚡</span>
         </AnimatedShinyText>
-        </div>
         </BlurFade>
       </div>
       
