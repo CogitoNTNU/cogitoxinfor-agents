@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from './ui/card';
 import { Textarea } from './ui/textarea';
@@ -14,6 +14,20 @@ const LandingChatbox: React.FC = () => {
   const [task, setTask] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Listen for external fill requests
+  useEffect(() => {
+    const container = document.getElementById('landing-chatbox');
+    if (!container) return;
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ text: string }>;
+      setTask(customEvent.detail.text);
+    };
+    container.addEventListener('fillChatInput', handler);
+    return () => {
+      container.removeEventListener('fillChatInput', handler);
+    };
+  }, []);
 
   const handleRun = async () => {
     if (!task.trim() || isLoading) return;
@@ -50,7 +64,7 @@ const LandingChatbox: React.FC = () => {
   };
 
   return (
-    <Card className="relative w-full mb-6 overflow-hidden">
+    <Card id="landing-chatbox" className="relative w-full mb-6 overflow-hidden">
         <ShineBorder shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]} />
       <CardContent className="p-2 relative">
      
