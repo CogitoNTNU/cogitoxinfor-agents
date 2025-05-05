@@ -4,7 +4,6 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { PlayIcon, Square, Plus, MinusCircle, Info } from 'lucide-react';
 import { useAgent } from '../context/AgentContext';
-// Removed ConfigModal import
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';

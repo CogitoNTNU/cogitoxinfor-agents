@@ -7,12 +7,13 @@ import { Play } from 'lucide-react';
 import { BorderBeam } from "@/components/magicui/border-beam";
 import { agentApi } from '@/services/api.tsx';
 import { ShineBorder } from "@/components/magicui/shine-border";
-
-
+import { Toggle } from "@/components/ui/toggle"
+import { Chrome, Info } from 'lucide-react';
 
 const LandingChatbox: React.FC = () => {
   const [task, setTask] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [inforMode, setInforMode] = useState(false);
   const navigate = useNavigate();
 
   // Listen for external fill requests
@@ -38,9 +39,10 @@ const LandingChatbox: React.FC = () => {
       const response = await agentApi.createAgent();
       const agentId = response.data.agent_id;
       
-      // Store the prompt and agent ID in localStorage
+      // Store the prompt, agent ID, and infor mode in localStorage
       localStorage.setItem('pendingPrompt', task);
       localStorage.setItem('pendingAgentId', agentId);
+      localStorage.setItem('inforMode', inforMode ? 'true' : 'false');
       
       // Redirect to the main app
       navigate('/app');
@@ -82,16 +84,25 @@ const LandingChatbox: React.FC = () => {
           className="border-none focus:border-none focus:ring-0 focus:outline-none resize-none"
           disabled={isLoading}
         />
-                 <div className="relative">
-          <Button 
-            onClick={handleRun} 
-            variant="ghost" 
-            className="absolute bottom-0 right-0 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center"
-            disabled={!task.trim() || isLoading}
-          >
-            <Play className="h-6 w-6" />
-          </Button>
-        </div>
+          <div className="relative flex items-center">
+            <Toggle 
+              className="absolute bottom-0 right-12 data-[state=on]:bg-blue-100"
+              pressed={inforMode}
+              onPressedChange={setInforMode}
+              title="Toggle Infor Mode"
+              aria-label="Toggle Infor Mode"
+            >
+              <Info className="h-4 w-4" />
+            </Toggle>
+            <Button 
+              onClick={handleRun} 
+              variant="ghost" 
+              className="absolute bottom-0 right-0 w-10 h-10 border border-gray-300 rounded-full flex items-center justify-center"
+              disabled={!task.trim() || isLoading}
+            >
+              <Play className="h-6 w-6" />
+            </Button>
+          </div>
       
       </CardContent>
     </Card>

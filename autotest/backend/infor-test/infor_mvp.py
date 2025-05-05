@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 from lmnr import Laminar
 from playwright.async_api import BrowserContext
 load_dotenv()
-API_KEY = os.getenv("LMNR_PROJECT_API_KEY")
+#API_KEY = os.getenv("LMNR_PROJECT_API_KEY")
 #Laminar.initialize(project_api_key=API_KEY)
 import os
 print("Current working directory:", os.getcwd())
@@ -32,32 +32,22 @@ browser = Browser(
     )
 )
 
-async def main():
+async def main(task):
     async with await browser.new_context() as context:
-        try:
-            with open("test_script.txt", "r") as file:
-                task_description = "".join(file.readlines())
-        except FileNotFoundError:
-            print("output.txt not found. Please ensure the file exists.")
-            task_description = ""
-
         m3_agent = Agent(
-            task=task_description,
+            task=task,
             llm=llm,
             browser=browser,
             initial_actions=[{'open_tab': {'url': 'https://mingle-portal.inforcloudsuite.com/v2/ICSGDENA002_DEV/aa98233d-0f7f-4fe7-8ab8-b5b66eb494c6?favoriteContext=bookmark?OIS100%26%26%26undefined%26A%26Kundeordre.%20%C3%85pne%26OIS100%20Kundeordre.%20%C3%85pne&LogicalId=lid://infor.m3.m3prduse1b'}},
                             {'open_tab': {'url': 'https://m3prduse1b.m3.inforcloudsuite.com/mne/infor?HybridCertified=1&xfo=https%3A%2F%2Fmingle-portal.inforcloudsuite.com&SupportWorkspaceFeature=0&Responsive=All&enable_health_service=true&portalV2Certified=1&LogicalId=lid%3A%2F%2Finfor.m3.m3&inforThemeName=Light&inforThemeColor=amber&inforCurrentLocale=en-US&inforCurrentLanguage=en-US&infor10WorkspaceShell=1&inforWorkspaceVersion=2025.03.03&inforOSPortalVersion=2025.03.03&inforTimeZone=(UTC%2B01%3A00)%20Dublin%2C%20Edinburgh%2C%20Lisbon%2C%20London&inforStdTimeZone=Europe%2FLondon&inforStartMode=3&inforTenantId=ICSGDENA002_DEV&inforSessionId=ICSGDENA002_DEV~6ba2f2fc-8f7b-4651-97de-06a45e5f54e7'}},
             ],
             browser_context=context,
-            save_conversation_path="logs/conversation" 
         )
 
-        #login_history = await login_agent.run()
         m3_history = await m3_agent.run()
 
 
 if __name__ == '__main__':
-    # Ensure the event loop is properly managed
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

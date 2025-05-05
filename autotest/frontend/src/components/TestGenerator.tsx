@@ -1,26 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MonacoEditor from '@monaco-editor/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Copy, Play } from 'lucide-react'; // Import Copy and Play icons
+import { Copy, Play, Info } from 'lucide-react'; // Import Copy, Play, and Info icons
 import { RainbowButton } from "@/components/magicui/rainbow-button";
 import { useAgent } from '../context/AgentContext';
 import { BlurFade } from './magicui/blur-fade';
+import { Toggle } from "@/components/ui/toggle";
 
 const TestGenerator: React.FC = () => {
   const [script, setScript] = useState<string>('');
   const [output, setOutput] = useState<string>('');
   const [loadingGen, setLoadingGen] = useState<boolean>(false);
   const [running, setRunning] = useState<boolean>(false);
+  const [inforMode, setInforMode] = useState<boolean>(localStorage.getItem('inforMode') === 'true');
+  
+  // Update localStorage when inforMode changes
+  useEffect(() => {
+    localStorage.setItem('inforMode', inforMode ? 'true' : 'false');
+    console.log(`Infor mode ${inforMode ? 'enabled' : 'disabled'}, saved to localStorage`);
+  }, [inforMode]);
   const { currentAgentId, actionHistory } = useAgent();
 
   const generateTest = async () => {
     if (!currentAgentId) return;
     
     console.log("Generating test for agent:", currentAgentId);
+    console.log("Using infor mode:", inforMode);
     setLoadingGen(true);
     try {
-      const url = `/api/generate?agentId=${currentAgentId}`;
+      const url = `/api/generate?agentId=${currentAgentId}&mode=${inforMode ? 'infor' : 'regular'}`;
       console.log("Fetching from URL:", url);
       const res = await fetch(url);
       
@@ -84,13 +93,27 @@ const TestGenerator: React.FC = () => {
 
   return (
     <div className="flex flex-col h-[40rem] w-[70rem] mx-auto">
-      <RainbowButton
-        className="mb-8 mt-8 self-center"
-        onClick={generateTest}
-        disabled={loadingGen || !canGenerateTest}
-      >
-        {loadingGen ? 'Generating…' : 'Generate test'}
-      </RainbowButton>
+      <div className="flex flex-col items-center mb-8 mt-8">
+        <div className="flex items-center mb-4">
+          <Toggle 
+            className="mr-2 data-[state=on]:bg-blue-100"
+            pressed={inforMode}
+            onPressedChange={setInforMode}
+            title="Toggle Infor Mode"
+            aria-label="Toggle Infor Mode"
+          >
+            <Info className="h-4 w-4 mr-2" />
+            Infor Mode
+          </Toggle>
+        </div>
+        <RainbowButton
+          className="self-center"
+          onClick={generateTest}
+          disabled={loadingGen || !canGenerateTest}
+        >
+          {loadingGen ? 'Generating…' : 'Generate test'}
+        </RainbowButton>
+      </div>
       {script ? (
 
         <div className="flex flex-row gap-4 flex-1 overflow-hidden">
@@ -157,14 +180,8 @@ const TestGenerator: React.FC = () => {
           </BlurFade>
         </div>
       ) : (
-        <div className="flex items-center justify-center flex-1">
-          <div className="text-center p-8 bg-gray-100 dark:bg-gray-800 rounded-lg">
-            <h3 className="text-xl font-medium mb-2">No Test Generated Yet</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Click the "Generate test" button above to create a test script based on the selected agent.
-            </p>
-          </div>
-        </div>
+      <div>
+      </div>
       )}
     </div>
   );

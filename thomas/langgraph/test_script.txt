@@ -1,0 +1,14 @@
+Press 'Ctrl'+'S' at the same time. 
+Result: Seachbar appears
+Search for OIS100.
+Result: Program: OIS100 opens
+Enter value in Customer field: 1337
+Result: Field is populated 
+Enter Req delivery date: [Todays date+2] (yy/mm/dd)
+Result: The field is populated
+Press Enter
+Result: Alert(Confirm) appears.
+Press OK
+Result: Pop up dissapears
+Press Next three times until Panel G appears.
+Result: Panel G appears

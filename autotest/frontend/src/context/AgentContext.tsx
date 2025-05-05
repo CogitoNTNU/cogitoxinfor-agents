@@ -16,6 +16,7 @@ interface AgentRunPayload {
   human_intervention: boolean;
   query: string;
   test_actions: Array<{ action: string; args: string[] }>; // Simplified action type for now
+  infor_mode?: boolean; // Added infor_mode parameter
 }
 
 // Define interface for Agent events
@@ -95,8 +96,16 @@ export const AgentProvider: React.FC<AgentContextProps> = ({ children }) => {
     }
 
     try {
+      // Check if infor_mode is set in localStorage
+      const inforMode = localStorage.getItem('inforMode') === 'true';
+      
+      // Add infor_mode to payload if it's not already set
+      if (payload.infor_mode === undefined) {
+        payload.infor_mode = inforMode;
+      }
+      
       console.log(`Running agent ${currentAgentId} with payload:`, payload); // Updated log
-      const response = await agentApi.runAgent(currentAgentId, payload.query); // Use payload.query
+      const response = await agentApi.runAgent(currentAgentId, payload.query, payload.infor_mode); // Pass infor_mode
       console.log("Agent run response:", response);
       setIsRunning(true);
       // Don't return the response

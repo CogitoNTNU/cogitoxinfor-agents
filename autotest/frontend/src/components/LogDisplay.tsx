@@ -146,7 +146,7 @@ export const LogDisplay: React.FC<LogDisplayProps> = ({
                 <div className="space-y-2">
                   {logs.map((log, idx) => (
                     <BlurFade key={idx} delay={0.005 * idx} inView> 
-                    <div key={idx} className="border rounded-md p-2 text-sm">
+                    <div key={idx} className="border max-w-[23.7rem] rounded-md p-2 text-sm">
                       <div className="flex justify-between items-center mb-1">
                         <span className={cn("font-medium", getLogTypeClass(log))}>
                           {formatLogType(log)}

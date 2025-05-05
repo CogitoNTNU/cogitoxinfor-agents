@@ -25,7 +25,7 @@ class AgentManager:
         self.start_time = time.time()
         logger.info(f'AgentManager initialized with max_agents={self.max_agents}')
 
-    async def create_agent(self, agent_id: str, task: str):
+    async def create_agent(self, agent_id: str, task: str, mode: str = "regular"):
         async with self._lock:
             if len(self.agents) >= self.max_agents:
                 current_memory = self.process.memory_info().rss / 1024 / 1024  # MB
@@ -41,32 +41,54 @@ class AgentManager:
                 agent_profile_dir = os.path.join(PROFILES_DIR)
                 os.makedirs(agent_profile_dir, exist_ok=True)
                 
-                # Configure browser with persistent profile
-                browser_config = BrowserConfig(
-                    headless=True,
-                    disable_security=True,
-                    extra_chromium_args=[f'--user-data-dir={agent_profile_dir}']
-                )
+                # Configure browser according to mode
+                if mode == "infor":
+                    browser_config = BrowserConfig(
+                        chrome_instance_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+                        headless=False,
+                        disable_security=True,
+                    )
+                else:
+                    browser_config = BrowserConfig(
+                        headless=True,
+                        disable_security=True,
+                        extra_chromium_args=[f'--user-data-dir={agent_profile_dir}']
+                    )
                 
                 browser = Browser(config=browser_config)
                 
-                # Create the agent with this browser
-                llm = ChatOpenAI(model='gpt-4.1-nano')
-                agent_instance = Agent(
-                    task=task,
-                    llm=llm,
-                    browser=browser  # Pass the configured browser
-                )
+                llm = ChatOpenAI(model='gpt-4.1')
+
+                if mode == "infor":
+                    agent_instance = Agent(
+                        task=task,
+                        llm=llm,
+                        browser=browser,  # Pass the configured browser
+                        initial_actions=[
+                            {'open_tab': {'url': 'https://mingle-portal.inforcloudsuite.com/v2/ICSGDENA002_DEV/aa98233d-0f7f-4fe7-8ab8-b5b66eb494c6?favoriteContext=bookmark?OIS100%26%26%26undefined%26A%26Kundeordre.%20%C3%85pne%26OIS100%20Kundeordre.%20%C3%85pne&LogicalId=lid://infor.m3.m3prduse1b'}},
+                            {'wait': {'seconds': 3}},
+                            {'open_tab': {'url': 'https://m3prduse1b.m3.inforcloudsuite.com/mne/infor?HybridCertified=1&xfo=https%3A%2F%2Fmingle-portal.inforcloudsuite.com&SupportWorkspaceFeature=0&Responsive=All&enable_health_service=true&portalV2Certified=1&LogicalId=lid%3A%2F%2Finfor.m3.m3&inforThemeName=Light&inforThemeColor=amber&inforCurrentLocale=en-US&inforCurrentLanguage=en-US&infor10WorkspaceShell=1&inforWorkspaceVersion=2025.03.03&inforOSPortalVersion=2025.03.03&inforTimeZone=(UTC%2B01%3A00)%20Dublin%2C%20Edinburgh%2C%20Lisbon%2C%20London&inforStdTimeZone=Europe%2FLondon&inforStartMode=3&inforTenantId=ICSGDENA002_DEV&inforSessionId=ICSGDENA002_DEV~6ba2f2fc-8f7b-4651-97de-06a45e5f54e7'}},
+                            # Press Ctrl+S to save
+                            {'send_keys': {'keys': 'Control+s'}},
+                        ],
+                    )
+                else:
+                    agent_instance = Agent(
+                        task=task,
+                        llm=llm,
+                        browser=browser,  # Pass the configured browser
+                    )
                 
                 agent = {
                     'instance': agent_instance,
                     'task': task,
+                    'mode': mode,
                     'running': False,
                     'created_at': time.time(),
                     'last_active': time.time(),
                 }
                 self.agents[agent_id] = agent
-                logger.info(f'Created agent {agent_id} with persistent profile at {agent_profile_dir}. Total agents: {len(self.agents)}')
+                logger.info(f'Created {mode} agent {agent_id} with persistent profile at {agent_profile_dir}. Total agents: {len(self.agents)}')
             except Exception as e:
                 logger.error(f'Failed to create agent {agent_id}: {str(e)}')
                 raise

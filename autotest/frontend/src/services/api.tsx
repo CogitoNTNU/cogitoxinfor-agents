@@ -8,8 +8,11 @@ export const agentApi = {
     axios.post(`${API_URL}/agent`),
 
   // Run an existing agent
-  runAgent: (agentId: string, query: string) =>
-    axios.post(`${API_URL}/agent/${agentId}/run`, { query }),
+  runAgent: (agentId: string, query: string, inforMode?: boolean) =>
+    axios.post(`${API_URL}/agent/${agentId}/run`, { 
+      query,
+      infor_mode: inforMode 
+    }),
   
   // Get agent status
   getAgentStatus: (agentId: string) => 
@@ -36,6 +39,10 @@ export const agentApi = {
   // Get agent history information
   getAgentHistory: (agentId: string) => 
     axios.get(`${API_URL}/agent/${agentId}/history`),
+    
+  // Get agent screenshot
+  getAgentScreenshot: (agentId: string, stepNumber?: number | null) => 
+    axios.get(`${API_URL}/agent/${agentId}/screenshot${stepNumber !== undefined && stepNumber !== null ? `?step=${stepNumber}` : ''}`),
 
   // Stream real-time logs and screenshots for a specific agent via SSE
   streamAgentEvents: (agentId: string): EventSource =>

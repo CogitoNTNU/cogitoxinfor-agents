@@ -11,7 +11,7 @@ const fillChatInput = (text: string) => {
 
 const handleBuyPS5 = () => {
   fillChatInput(
-    'Search on finn.no for a ps5 controller and message the owner that i want it for 80% of the price.'
+    'Search for "Sverre Nystand Github" click on it and find out how many commits he has'
   );
 };
 
@@ -25,9 +25,9 @@ const handleAnswerMail = () => {
   fillChatInput('Open outlook and answer my most recent mail.');
 };
 
-const handleFindFlights = () => {
+const handleInforTest = () => {
   fillChatInput(
-    'On booking.com search for flights from Oslo to Singapore in june and select the best one.'
+    `Search for OIS100.\nResult: Program: OIS100 opens\nEnter value in Customer field: 1337\nResult: Field is populated\nEnter Req delivery date: [Today's date+2] (yy/mm/dd)\nResult: The field is populated\nPress Enter\nResult: Alert (Confirm) appears.\nPress OK\nResult: Pop up disappears\nPress Next three times until Panel G appears.\nResult: Panel G appears`
   );
 };
 
@@ -39,7 +39,7 @@ const Landing: React.FC = () => {
         <div className="max-w-3xl mx-auto space-y-6 mb-16">
           <BlurFade delay={0.3} inView>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tighter text-white">
-              <span className="block">Test Any Website</span>
+              <span className="block">Automate Any Web Workflow</span>
             </h1>
           </BlurFade>
           
@@ -52,12 +52,12 @@ const Landing: React.FC = () => {
               <div className="hidden md:block text-white">→</div>
               <div className="flex items-center">
                 <span className="bg-white/30 rounded-full h-10 w-10 flex items-center justify-center mr-2 text-white shadow-inner border border-white/20">2</span>
-                <p>Logs each step</p>
+                <p>Captures every step</p>
               </div>
               <div className="hidden md:block text-white">→</div>
               <div className="flex items-center">
                 <span className="bg-white/30 rounded-full h-10 w-10 flex items-center justify-center mr-2 text-white shadow-inner border border-white/20">3</span>
-                <p>Generates tests</p>
+                <p>Executes workflows</p>
               </div>
             </div>
           </BlurFade>
@@ -71,30 +71,30 @@ const Landing: React.FC = () => {
       <div className="flex flex-wrap justify-center pt-0!">
       <button
         onClick={handleBuyPS5}
-        className="rounded-full text-white px-3 m-2 py-2 bg-yellow-500/30"
+        className="rounded-full text-black px-3 m-2 py-2 bg-white/90"
       >
-        Buy me a PS5 on finn.no
+        Book a teams meeting
       </button>
 
       <button
         onClick={handleTestWebsite}
-        className="rounded-full text-white px-3 m-2 py-2 bg-blue-500/50"
+        className="rounded-full text-black px-3 m-2 py-2 bg-white/90"
       >
-        Test this website
+        Test my website
       </button>
 
       <button
         onClick={handleAnswerMail}
-        className="rounded-full text-white px-3 m-2 py-2 bg-green-500/50"
+        className="rounded-full text-black px-3 m-2 py-2 bg-white/90"
       >
         Answer my latest mail
       </button>
 
       <button
-        onClick={handleFindFlights}
-        className="rounded-full text-white px-3 m-2 py-2 bg-purple-500/50"
+        onClick={handleInforTest}
+        className="rounded-full text-black px-3 m-2 py-2 bg-white/90"
       >
-        Find flights from Oslo to Singapore
+        Test Customer Order in Infor M3 
       </button>
     </div>
         </BlurFade>

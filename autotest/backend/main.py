@@ -90,6 +90,7 @@ from pydantic import BaseModel
 
 class RunRequest(BaseModel):
     query: str
+    infor_mode: bool = False
 
 from agent_manager import AgentManager
 # Create a singleton instance
@@ -173,17 +174,30 @@ def record_activity_after(agent_id: str):
                         # Timestamp and step
                         ts = datetime.now(timezone.utc).isoformat()
                         step = step_number
-                        # Derive selector: prefer css_selector, then element_id, then attributes
+                        # Derive selector: extract element ID if available, otherwise use css_selector
                         selector = None
                         interacted = getattr(last_entry.state, "interacted_element", None)
                         if interacted and i < len(interacted) and interacted[i]:
                             el = interacted[i]
-                            if hasattr(el, "css_selector") and el.css_selector:
-                                selector = el.css_selector
-                            elif hasattr(el, "id") and el.id:
-                                selector = f"#{el.id}"
+                            # For logging purposes, we want to extract just the ID
+                            # But we need to preserve the original selector format for Playwright
+                            
+                            # First check if we can get the ID directly
+                            if hasattr(el, "id") and el.id:
+                                selector = el.id  # Use ID directly for Playwright compatibility
                             elif hasattr(el, "attributes") and el.attributes.get("id"):
-                                selector = f"#{el.attributes['id']}"
+                                selector = el.attributes['id']  # Use ID directly for Playwright compatibility
+                            # If we have a CSS selector, try to extract ID from it
+                            elif hasattr(el, "css_selector") and el.css_selector:
+                                # Look for [id="..."] pattern in the selector
+                                import re
+                                id_match = re.search(r'\[id=["\']([^"\']+)["\']', el.css_selector)
+                                if id_match:
+                                    # Extract just the ID for logging
+                                    selector = id_match.group(1)
+                                else:
+                                    # If no ID found in selector, use the full selector
+                                    selector = el.css_selector
                         # Build record
                         rec = {"step": step, "timestamp": ts, "action": norm_action}
                         if selector:
@@ -345,7 +359,9 @@ async def run_agent(agent_id: str, request: RunRequest):
             agent_manager.agents.pop(agent_id)
 
         # Create a brand-new agent with this query
-        await agent_manager.create_agent(agent_id, request.query)
+        # Pass infor_mode to create_agent
+        mode = "infor" if request.infor_mode else "regular"
+        await agent_manager.create_agent(agent_id, request.query, mode)
 
         agent = agent_manager.get_agent(agent_id)
         agent_manager.set_running(agent_id, True)
@@ -362,6 +378,7 @@ async def run_agent(agent_id: str, request: RunRequest):
             'status': 'running',
             'agent_id': agent_id,
             'query': request.query,
+            'infor_mode': request.infor_mode,
             'setup_time_ms': setup_time * 1000,
             'total_agents': len(agent_manager.agents),
         }
@@ -431,7 +448,7 @@ async def create_agent():
     # Generate a unique agent ID
     new_id = str(uuid.uuid4())
     # Create the agent with an empty initial task
-    await agent_manager.create_agent(new_id, "")
+    await agent_manager.create_agent(new_id, "", "regular")
     return {"agent_id": new_id}
             
 @app.get('/agent/{agent_id}/history')

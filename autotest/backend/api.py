@@ -235,8 +235,32 @@ async def save_log(request: Request):
     }
 
 @app.get("/api/generate")
-async def generate_test(agentId: str):
+async def generate_test(agentId: str, mode: str = "regular"):
     base_dir = Path(DATA_DIR) / agentId
+    # Log the received mode parameter
+    logger.info(f"Test generation requested for agent {agentId} with mode parameter: '{mode}'")
+    
+    # Normalize mode to lower‑case for flexible matching
+    mode = (mode or "regular").lower()
+    logger.info(f"Normalized mode: '{mode}', will use infor mode: {mode.startswith('infor')}")
+
+    # Hard‑coded Chrome path for Infor mode
+    INFOR_CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+    # Path to the signed‑in Chrome *user‑data* directory we want to reuse
+    # Root *user‑data* directory that contains the `Default/`, `Profile 1/`, … sub‑folders.
+    # Playwright expects the root, not the nested 'Default' folder.
+    INFOR_PROFILE_PATH = '/Users/nybruker/Library/Application Support/Google/Chrome'
+
+    # Initial actions for Infor portal (navigate, then save with Ctrl+S)
+    INFOR_INITIAL_ACTIONS = [
+        "        # Initial actions for Infor portal (navigate, then save with Ctrl+S)",
+        "        await page.goto('https://mingle-portal.inforcloudsuite.com/v2/ICSGDENA002_DEV/aa98233d-0f7f-4fe7-8ab8-b5b66eb494c6?favoriteContext=bookmark?OIS100%26%26%26undefined%26A%26Kundeordre.%20%C3%85pne%26OIS100%20Kundeordre.%20%C3%85pne&LogicalId=lid://infor.m3.m3prduse1b')",
+        "        await page.wait_for_timeout(3000)",
+        "        await page.goto('https://m3prduse1b.m3.inforcloudsuite.com/mne/infor?HybridCertified=1&xfo=https%3A%2F%2Fmingle-portal.inforcloudsuite.com&SupportWorkspaceFeature=0&Responsive=All&enable_health_service=true&portalV2Certified=1&LogicalId=lid%3A%2F%2Finfor.m3.m3&inforThemeName=Light&inforThemeColor=amber&inforCurrentLocale=en-US&inforCurrentLanguage=en-US&infor10WorkspaceShell=1&inforWorkspaceVersion=2025.03.03&inforOSPortalVersion=2025.03.03&inforTimeZone=(UTC%2B01%3A00)%20Dublin%2C%20Edinburgh%2C%20Lisbon%2C%20London&inforStdTimeZone=Europe%2FLondon&inforStartMode=3&inforTenantId=ICSGDENA002_DEV&inforSessionId=ICSGDENA002_DEV~6ba2f2fc-8f7b-4651-97de-06a45e5f54e7')",
+        "        # Ensure the page has focus and trigger Ctrl+S (capital S required for Playwright)",
+        "        await page.wait_for_timeout(3000)",
+        "        await page.keyboard.press('Control+S')",  
+    ]
 
     # Load distilled testing steps
     testing_file = base_dir / "testing_steps.json"
@@ -251,33 +275,62 @@ async def generate_test(agentId: str):
         raise HTTPException(404, "No testing_steps.json for this agent")
 
     # Build the Playwright script
-    lines = [
-        "import pytest",
-        "from playwright.sync_api import sync_playwright",
-        "",
-        "def test_from_steps():",
-        "    with sync_playwright() as p:",
-        "        browser = p.chromium.launch(headless=False)",
-        "        page = browser.new_page()",
-    ]
+    logger.info(f"Mode check: mode='{mode}', startswith('infor')={mode.startswith('infor')}")
+    if mode.startswith("infor"):
+        lines = [
+            "import pytest",
+            "import asyncio",
+            "from playwright.async_api import async_playwright",
+            "",
+            "@pytest.mark.asyncio",
+            "async def test_from_steps():",
+            "    async with async_playwright() as p:",
+            "        # Attach to the already‑running Chrome that was started with --remote-debugging-port=9222",
+            "        browser = await p.chromium.connect_over_cdp('http://localhost:9222')",
+            "        # Re‑use the first context if it exists, otherwise create one",
+            "        context = browser.contexts[0] if browser.contexts else await browser.new_context()",
+            "        page = await context.new_page()",
+        ] + INFOR_INITIAL_ACTIONS
+    else:
+        lines = [
+            "import pytest",
+            "import asyncio",
+            "from playwright.async_api import async_playwright",
+            "",
+            "@pytest.mark.asyncio",
+            "async def test_from_steps():",
+            "    async with async_playwright() as p:",
+            "        browser = await p.chromium.launch(headless=False)",
+            "        page = await browser.new_page()",
+        ]
     for step in steps:
         action = step.get("action")
         sel = step.get("selector", "")
+        
+        # Check if selector is an element ID (not starting with #, ., or containing spaces/special chars)
+        # and add # prefix if needed
+        if sel and not sel.startswith(('#', '.')) and not any(c in sel for c in ' >+~:[]()'):
+            # This is likely an element ID without the # prefix
+            sel = f"#{sel}"
+            
         if action == "navigate":
             url = step.get("url", "")
-            lines.append(f"        page.goto({url!r})")
+            lines.append(f"        await page.goto({url!r})")
         elif action == "click":
             btn = step.get("button", "left")
             count = step.get("click_count", 1)
-            lines.append(f"        page.click({sel!r}, button={btn!r}, click_count={count})")
+            lines.append(f"        await page.click({sel!r}, button={btn!r}, click_count={count})")
         elif action == "wait":
             timeout = step.get("timeout", 0)
-            lines.append(f"        page.wait_for_timeout({timeout})")
+            lines.append(f"        await page.wait_for_timeout({timeout})")
         elif action in ("fill", "input"):
             text = step.get("text", "")
-            lines.append(f"        page.fill({sel!r}, {text!r})")
+            lines.append(f"        await page.fill({sel!r}, {text!r})")
 
-    lines.append("        browser.close()")
+    if mode.startswith("infor"):
+        lines.append("        await context.close()")
+    else:
+        lines.append("        await browser.close()")
     script = "\n".join(lines)
     return Response(script, media_type="text/plain")
 
