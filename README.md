@@ -9,8 +9,6 @@ https://github.com/user-attachments/assets/129f85b6-8a73-432b-b68b-2cc75d0b368a
 
 
 
-⸻
-
 
 <details> 
 <summary><b>📋 Table of contents </b></summary>
@@ -30,9 +28,6 @@ https://github.com/user-attachments/assets/129f85b6-8a73-432b-b68b-2cc75d0b368a
 </details>
 
 
-
-⸻
-
 Description
 
 This project was built in collaboration with Infor, the world’s third-largest ERP provider, to solve a real-world bottleneck:
@@ -46,7 +41,7 @@ We created an AI-driven solution that automates both test creation and test exec
 
 👉 The result: Deterministic Playwright test scripts automatically generated from an AI agent’s navigation, with full traceability through screenshots. This makes tests fast, repeatable, and scalable – without writing a single line of code.
 
-⸻
+
 
 Key Features
 	•	⚡ Massive time savings – reduces thousands of hours of manual testing every year.
@@ -55,7 +50,7 @@ Key Features
 	•	📜 Deterministic Playwright scripts – reproducible and reliable automation output.
 	•	🎨 User-friendly frontend – request tests, view screenshots of each action, and export working scripts.
 
-⸻
+
 
 Architecture
 
@@ -74,7 +69,7 @@ flowchart LR
     F --> G[User Downloads Ready-to-Run Tests]
 
 
-⸻
+
 
 Getting Started
 
@@ -86,7 +81,7 @@ Prerequisites
 
 Make sure Git is installed.
 
-⸻
+
 
 Configuration
 	1.	Create and activate a virtual environment:
@@ -116,7 +111,7 @@ ANONYMIZED_TELEMETRY=true
 BROWSER_USE_LOGGING_LEVEL=info
 
 
-⸻
+
 
 Usage
 
@@ -134,7 +129,7 @@ To run the test suite:
 pytest
 
 
-⸻
+
 
 Team
 
@@ -154,16 +149,16 @@ This project was developed by the Cogito x Infor Spring 2025 team.
 
 
 
-⸻
+
 
 License
 
 Distributed under the MIT License. See LICENSE for more information.
 
-⸻
+
 
 ✨ With this project, we’ve taken manual, repetitive testing and transformed it into an AI-driven, no-code workflow – saving time, scaling efficiency, and enabling faster innovation.
 
-⸻
+
 
 Would you like me to also make a shorter, more business-facing README summary (like a pitch for non-technical visitors on GitHub) in addition to this detailed developer README?
