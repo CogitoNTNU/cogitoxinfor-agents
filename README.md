@@ -1,7 +1,3 @@
-Got it 🚀 I’ll help you “pimp up” the README so it looks professional, engaging, and explains your project clearly to newcomers (both techies and non-techies). Here’s a rewritten version of your README with stronger descriptions, storytelling, and structure:
-
-⸻
-
 Cogito x Infor – AI-Powered Test Automation Agents (Spring 2025)
 
 https://github.com/user-attachments/assets/129f85b6-8a73-432b-b68b-2cc75d0b368a
