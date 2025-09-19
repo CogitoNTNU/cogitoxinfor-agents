@@ -1,141 +1,173 @@
-<!-- TODO: CHANGE ALL INSTANCES OF "TEMPLATE-README" IN ENTIRE PROJECT TO YOUR PROJECT TITLE-->
-# Cogito x Infor vår 2025 - Agenter 
+Got it 🚀 I’ll help you “pimp up” the README so it looks professional, engaging, and explains your project clearly to newcomers (both techies and non-techies). Here’s a rewritten version of your README with stronger descriptions, storytelling, and structure:
 
+⸻
 
+Cogito x Infor – AI-Powered Test Automation Agents (Spring 2025)
 
 https://github.com/user-attachments/assets/129f85b6-8a73-432b-b68b-2cc75d0b368a
 
-
 <div align="center">
 
-![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/CogitoNTNU/TEMPLATE-README/ci.yml)
-![GitHub top language](https://img.shields.io/github/languages/top/CogitoNTNU/TEMPLATE-README)
-![GitHub language count](https://img.shields.io/github/languages/count/CogitoNTNU/TEMPLATE-README)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Project Version](https://img.shields.io/badge/version-0.0.1-blue)](https://img.shields.io/badge/version-0.0.1-blue)
-![Cogito Infor Presentation (1)](https://github.com/user-attachments/assets/59dab0e7-83b3-4817-bd34-ead92445ce33)
 
 </div>
 
 
 
+⸻
+
+
 <details> 
 <summary><b>📋 Table of contents </b></summary>
 
-- [TEMPLATE-README](#template-readme)
-  - [Description](#description)
-  - [Getting started](#getting-started)
-    - [Prerequisites](#prerequisites)
-  - [Usage](#usage)
-  - [Testing](#testing)
-  - [Team](#team)
-    - [License](#license)
+
+	•	Description
+	•	Key Features
+	•	Architecture
+	•	Getting Started
+	•	Prerequisites
+	•	Configuration
+	•	Usage
+	•	Testing
+	•	Team
+	•	License
 
 </details>
 
-## Description 
-<!-- TODO: Provide a brief overview of what this project does and its key features. Please add pictures or videos of the application -->
 
 
-## Getting started
-<!-- TODO: In this Section you describe how to install this project in its intended environment.(i.e. how to get it to run)  
--->
+⸻
+
+Description
+
+This project was built in collaboration with Infor, the world’s third-largest ERP provider, to solve a real-world bottleneck:
+💡 The company spends tens of thousands of hours every year on manual software testing. Testers read PDFs with step-by-step instructions and then manually click through the ERP system’s UI.
+
+We created an AI-driven solution that automates both test creation and test execution by combining:
+	•	Browser-Use (agent framework)
+	•	GPT-4o (multimodal reasoning on screenshots & HTML)
+	•	Playwright (E2E test automation)
+	•	Next.js (intuitive frontend)
+
+👉 The result: Deterministic Playwright test scripts automatically generated from an AI agent’s navigation, with full traceability through screenshots. This makes tests fast, repeatable, and scalable – without writing a single line of code.
+
+⸻
+
+Key Features
+	•	⚡ Massive time savings – reduces thousands of hours of manual testing every year.
+	•	🖱️ No-code test generation – users create end-to-end tests without programming knowledge.
+	•	🤖 AI-powered navigation – GPT-4o agents explore web UIs using screenshots and HTML.
+	•	📜 Deterministic Playwright scripts – reproducible and reliable automation output.
+	•	🎨 User-friendly frontend – request tests, view screenshots of each action, and export working scripts.
+
+⸻
+
+Architecture
+
+flowchart LR
+    subgraph User
+    A[Test Request] --> B[Next.js Frontend]
+    end
+    
+    subgraph Backend
+    B --> C[Browser-Use Agent (GPT-4o)]
+    C --> D[Web Application under Test]
+    C --> E[Generate Playwright Scripts]
+    end
+
+    E --> F[Next.js Frontend]
+    F --> G[User Downloads Ready-to-Run Tests]
 
 
-### Configuration
+⸻
 
-# Create a virtual environment
-```bash
+Getting Started
+
+Prerequisites
+	•	Python 3.9+
+	•	Node.js (for Next.js frontend)
+	•	Git
+	•	Playwright
+
+Make sure Git is installed.
+
+⸻
+
+Configuration
+	1.	Create and activate a virtual environment:
+
+Mac/Linux:
+
 python -m venv venv
-```
-
-# Activate the environment
-Mac
-```bash
 source venv/bin/activate
-```
 
-Windows
-```bash
+Windows:
+
+python -m venv venv
 venv\Scripts\activate
-```
 
-```bash
-venv\Scripts\Activate.ps1
-Set-ExecutionPolicy Unrestricted -Scope Process
-```
+	2.	Install dependencies:
 
-# Install requirements
-
-If you dont have pip installed. Go to [this link](https://pip.pypa.io/en/stable/installation/#)
-```bash
-pip install -r requrements.txt
-```
-```bash
+pip install -r requirements.txt
 pip install browser-use
-```
-
-Install playwright
-```bash
 playwright install
-```
 
-Create a `.env` file in the root directory of the project and add the following environment variables:
+	3.	Create a .env file in the root directory:
 
-```bash
 OPENAI_API_KEY=""
-ANTHROPIC_API_KEY=
-DEEPSEEK_API_KEY= ""
-# Set to false to disable anonymized telemetry
+ANTHROPIC_API_KEY=""
+DEEPSEEK_API_KEY=""
 ANONYMIZED_TELEMETRY=true
 BROWSER_USE_LOGGING_LEVEL=info
-```
 
 
--->
+⸻
 
-### Prerequisites
-<!-- TODO: In this section you put what is needed for the program to run.
-For example: OS version, programs, libraries, etc.  
+Usage
 
--->
-- Ensure that git is installed on your machine. [Download Git](https://git-scm.com/downloads)
+Run the project from the root directory:
 
-
-
-## Usage
-To run the project, run the following command from the root directory of the project:
-```bash
 python3 main.py
-```
-<!-- TODO: Instructions on how to run the project and use its features. -->
 
-## Testing
-To run the test suite, run the following command from the root directory of the project:
-```bash
 
-```
+⸻
 
-## Team
-This project would not have been possible without the hard work and dedication of all of the contributors. Thank you for the time and effort you have put into making this project a reality.
+Testing
 
+To run the test suite:
+
+pytest
+
+
+⸻
+
+Team
+
+This project was developed by the Cogito x Infor Spring 2025 team.
 
 <table align="center">
     <tr>
-        <!--
+        <!-- Example format for team members -->
         <td align="center">
             <a href="https://github.com/NAME_OF_MEMBER">
               <img src="https://github.com/NAME_OF_MEMBER.png?size=100" width="100px;" alt="NAME OF MEMBER"/><br />
               <sub><b>NAME OF MEMBER</b></sub>
             </a>
         </td>
-        -->
     </tr>
 </table>
 
-![Group picture](docs/img/team.png)
 
 
-### License
-------
-Distributed under the MIT License. See `LICENSE` for more information.
+⸻
+
+License
+
+Distributed under the MIT License. See LICENSE for more information.
+
+⸻
+
+✨ With this project, we’ve taken manual, repetitive testing and transformed it into an AI-driven, no-code workflow – saving time, scaling efficiency, and enabling faster innovation.
+
+⸻
+
+Would you like me to also make a shorter, more business-facing README summary (like a pitch for non-technical visitors on GitHub) in addition to this detailed developer README?
